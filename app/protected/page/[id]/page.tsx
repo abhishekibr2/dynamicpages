@@ -301,6 +301,15 @@ export default function PageEditor({ params }: PageEditorProps) {
 
                                     <div className="space-y-2">
                                         <Label htmlFor="method">Method</Label>
+                                        {watch('method') === 'POST' && (
+                                            <p className="text-sm text-muted-foreground">You can access body variables using data and a dot notation. <br />
+                                                <br />
+                                                Example: <br />
+                                                <br />
+                                                data.name <br />
+                                                data.age <br />
+                                            </p>
+                                        )}
                                         <Select
                                             value={watch('method')}
                                             onValueChange={(value) => setValue('method', value as 'GET' | 'POST')}
