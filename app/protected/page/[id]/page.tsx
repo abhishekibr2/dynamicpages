@@ -29,6 +29,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import Link from "next/link"
 
 interface PageEditorProps {
     params: Promise<{
@@ -212,13 +213,9 @@ export default function PageEditor({ params }: PageEditorProps) {
                         </h1>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push('/protected')}
-                        >
+                        <Link href="/protected">
                             Cancel
-                        </Button>
+                        </Link>
                         {!isNewPage && (
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
