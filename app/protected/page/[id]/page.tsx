@@ -325,19 +325,33 @@ export default function PageEditor({ params }: PageEditorProps) {
                     </div>
 
                     {/* Right Column - Code Editor and Output */}
-                    <div className="space-y-6">
+                    <div className="space-y-6 min-w-[800px]">
                         <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
                             <div className="p-4 border-b flex justify-between items-center">
                                 <Label className="text-sm font-medium">Code Editor</Label>
-                                <Button
-                                    onClick={handleRunCode}
-                                    disabled={isRunning}
-                                    size="sm"
-                                    className="gap-2"
-                                >
-                                    <Play className="h-4 w-4" />
-                                    {isRunning ? 'Running...' : 'Run Code'}
-                                </Button>
+                                <div className="flex gap-2">
+
+                                    <Button
+                                        onClick={handleRunCode}
+                                        disabled={isRunning}
+                                        size="sm"
+                                        className="gap-2"
+                                    >
+                                        <Play className="h-4 w-4" />
+                                        {isRunning ? 'Running...' : 'Run Code'}
+                                    </Button>
+                                    <Button
+                                        onClick={() => {
+                                            window.open(`/api${watch('endpoint')}`, '_blank')
+                                        }}
+                                        disabled={isRunning}
+                                        size="sm"
+                                        className="gap-2"
+                                    >
+                                        <Play className="h-4 w-4" />
+                                        Run Code in API form
+                                    </Button>
+                                </div>
                             </div>
                             <div className={cn(
                                 "h-[400px]",
