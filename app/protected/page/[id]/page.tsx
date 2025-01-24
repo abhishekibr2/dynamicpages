@@ -340,17 +340,19 @@ export default function PageEditor({ params }: PageEditorProps) {
                                         <Play className="h-4 w-4" />
                                         {isRunning ? 'Running...' : 'Run Code'}
                                     </Button>
-                                    <Button
-                                        onClick={() => {
-                                            window.open(`/api${watch('endpoint')}`, '_blank')
-                                        }}
-                                        disabled={isRunning}
-                                        size="sm"
-                                        className="gap-2"
-                                    >
-                                        <Play className="h-4 w-4" />
-                                        Run Code in API form
-                                    </Button>
+                                    {watch('method') === 'GET' && (
+                                        <Button
+                                            onClick={() => {
+                                                window.open(`/api${watch('endpoint')}`, '_blank')
+                                            }}
+                                            disabled={isRunning}
+                                            size="sm"
+                                            className="gap-2"
+                                        >
+                                            <Play className="h-4 w-4" />
+                                            Run Code in API form
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                             <div className={cn(
