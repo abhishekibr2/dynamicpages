@@ -32,13 +32,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={geistSans.className} suppressHydrationWarning>
       <body className="bg-background text-foreground">
+        <TopLoader />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <TopLoader />
 
           <main className="min-h-screen flex flex-col items-center w-full">
             <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
