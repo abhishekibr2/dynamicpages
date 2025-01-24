@@ -22,7 +22,7 @@ import child_process from 'child_process'
 export async function POST(request: Request) {
   try {
     const { code } = await request.json()
-
+    const data = request.body
     // Create a modules object with commonly used modules
     const modules = {
       express,
@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       output: '',
       consoleOutput: '',
       module: { exports: {} },
+      data,
       fetch,
       setTimeout,
       require: (moduleName: string) => {
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
     try {
       // Wrap the code in an async IIFE to support async/await
       const wrappedCode = `
-        (async () => {
+        (async (data) => {
           try {
             ${code}
             // Wait a bit for any pending async operations
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
           } catch (error) {
             console.log('Error in execution:', error.message);
           }
-        })()`;
+        })(${JSON.stringify(data)})`;
 
       // Run the code in the sandbox and await the result
       const result = await runInNewContext(wrappedCode, sandbox, {

@@ -15,6 +15,7 @@ import zlib from 'zlib'
 import os from 'os'
 import child_process from 'child_process'
 import { getPageByEndpoint } from '@/utils/supabase/actions/page'
+import axios from 'axios'
 
 // Create a modules object with commonly used modules
 const modules = {
@@ -32,6 +33,8 @@ const modules = {
   zlib,
   os,
   child_process,
+  fetch,
+  axios
 }
 
 export async function GET(request: NextRequest) {
@@ -45,6 +48,7 @@ export async function POST(request: NextRequest) {
 async function handleRequest(request: NextRequest, method: string) {
   try {
     const pathname = request.nextUrl.pathname.split('/api/')[1]
+    const data = await request.json()
     console.log('Pathname:', pathname)
     // Get the page from the database using the endpoint and method
     console.log('Getting page by endpoint:', pathname, 'Method:', method)
@@ -63,6 +67,7 @@ async function handleRequest(request: NextRequest, method: string) {
     // Create a sandbox with console.log and require
     const sandbox = {
       output: '',
+      data,
       module: { exports: {} },
       require: (moduleName: string) => {
         if (modules.hasOwnProperty(moduleName)) {
@@ -107,6 +112,7 @@ async function handleRequest(request: NextRequest, method: string) {
       const response = NextResponse.json(
         sandbox.response.body || { 
           success: true,
+          data: sandbox.data,
           output: sandbox.output || 'Code executed successfully (no output)',
           error: null 
         },
