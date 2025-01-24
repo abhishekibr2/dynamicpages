@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 async function handleRequest(request: NextRequest, method: string) {
   try {
     const pathname = request.nextUrl.pathname.split('/api/')[1]
-    
+    console.log('Pathname:', pathname)
     // Get the page from the database using the endpoint and method
     console.log('Getting page by endpoint:', pathname, 'Method:', method)
     const page = await getPageByEndpoint(pathname, method)
