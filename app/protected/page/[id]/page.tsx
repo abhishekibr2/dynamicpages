@@ -28,6 +28,7 @@ import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { cn } from "@/lib/utils"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface PageEditorProps {
     params: Promise<{
@@ -57,6 +58,7 @@ export default function PageEditor({ params }: PageEditorProps) {
     const router = useRouter()
     const isNewPage = resolvedParams.id === 'new'
     const [output, setOutput] = useState<string>('')
+    const [consoleOutput, setConsoleOutput] = useState<string>('')
     const [isRunning, setIsRunning] = useState(false)
 
     const {
@@ -158,6 +160,7 @@ export default function PageEditor({ params }: PageEditorProps) {
 
         setIsRunning(true)
         setOutput('Running...')
+        setConsoleOutput('Running...')
 
         try {
             const response = await fetch('/api/execute', {
@@ -172,11 +175,14 @@ export default function PageEditor({ params }: PageEditorProps) {
 
             if (data.error) {
                 setOutput(data.error)
+                setConsoleOutput('')
             } else {
                 setOutput(data.output)
+                setConsoleOutput(data.consoleOutput)
             }
         } catch (error) {
             setOutput(`Error: ${error}`)
+            setConsoleOutput('')
         } finally {
             setIsRunning(false)
         }
@@ -187,42 +193,38 @@ export default function PageEditor({ params }: PageEditorProps) {
     }
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background w-full">
             {/* Header */}
             <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="container flex h-16 items-center">
-                    <Button
-                        variant="ghost"
-                        className="gap-2"
-                        onClick={() => router.back()}
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back
-                    </Button>
-                </div>
-            </div>
-
-            {/* Main Content */}
-            <div className="container py-6 space-y-8">
-                {/* Title Bar */}
-                <div className="flex justify-between items-center">
-                    <h1 className="text-3xl font-bold tracking-tight">
-                        {isNewPage ? 'Create New Page' : 'Edit Page'}
-                    </h1>
+                <div className="w-full px-6 flex h-14 items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => router.back()}
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            Back
+                        </Button>
+                        <h1 className="text-xl font-semibold">
+                            {isNewPage ? 'Create New Page' : 'Edit Page'}
+                        </h1>
+                    </div>
                     <div className="flex items-center gap-3">
                         <Button
                             variant="outline"
+                            size="sm"
                             onClick={() => router.push('/protected')}
-                            className="px-6"
                         >
                             Cancel
                         </Button>
                         {!isNewPage && (
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" className="px-6">Delete</Button>
+                                    <Button variant="destructive" size="sm">Delete</Button>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent className="sm:max-w-[425px]">
+                                <AlertDialogContent>
                                     <AlertDialogHeader>
                                         <AlertDialogTitle>Delete Page?</AlertDialogTitle>
                                         <AlertDialogDescription>
@@ -242,25 +244,26 @@ export default function PageEditor({ params }: PageEditorProps) {
                                 </AlertDialogContent>
                             </AlertDialog>
                         )}
-                        <Button onClick={handleFormSubmit(onSubmit)} className="px-6">
+                        <Button size="sm" onClick={handleFormSubmit(onSubmit)}>
                             {isNewPage ? 'Create' : 'Save Changes'}
                         </Button>
                     </div>
                 </div>
+            </div>
 
-                {/* Content Grid */}
-                <div className="grid lg:grid-cols-2 gap-8">
+            {/* Main Content */}
+            <div className="w-full px-6 py-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     {/* Left Column - Form */}
                     <div className="space-y-6">
-                        <div className="p-6 rounded-lg border bg-card text-card-foreground shadow-sm">
-                            <div className="space-y-4">
+                        <div className="rounded-lg border bg-card">
+                            <div className="p-6 space-y-6">
                                 <div className="space-y-2">
-                                    <Label htmlFor="title" className="text-sm font-medium">Title</Label>
+                                    <Label htmlFor="title">Title</Label>
                                     <Input
                                         id="title"
                                         {...register('title')}
                                         className={cn(
-                                            "w-full",
                                             errors.title && "border-destructive focus-visible:ring-destructive"
                                         )}
                                     />
@@ -270,12 +273,12 @@ export default function PageEditor({ params }: PageEditorProps) {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="description" className="text-sm font-medium">Description</Label>
+                                    <Label htmlFor="description">Description</Label>
                                     <Textarea
                                         id="description"
                                         {...register('description')}
                                         className={cn(
-                                            "min-h-[100px] resize-none",
+                                            "min-h-[120px] resize-none",
                                             errors.description && "border-destructive focus-visible:ring-destructive"
                                         )}
                                     />
@@ -286,7 +289,7 @@ export default function PageEditor({ params }: PageEditorProps) {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="endpoint" className="text-sm font-medium">Endpoint</Label>
+                                        <Label htmlFor="endpoint">Endpoint</Label>
                                         <Input
                                             id="endpoint"
                                             {...register('endpoint')}
@@ -300,7 +303,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="method" className="text-sm font-medium">Method</Label>
+                                        <Label htmlFor="method">Method</Label>
                                         <Select
                                             value={watch('method')}
                                             onValueChange={(value) => setValue('method', value as 'GET' | 'POST')}
@@ -322,84 +325,102 @@ export default function PageEditor({ params }: PageEditorProps) {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Output Sections */}
+                        <div className="rounded-lg border">
+                            <Tabs defaultValue="execution" className="w-full ">
+                                <div className="flex items-center justify-between border-b px-3 py-2">
+                                    <TabsList className="h-12 bg-transparent">
+                                        <TabsTrigger value="execution" className="">
+                                            Execution Output
+                                        </TabsTrigger>
+                                        <TabsTrigger value="console" className="">
+                                            Console Output
+                                        </TabsTrigger>
+                                    </TabsList>
+                                </div>
+                                <TabsContent value="execution" className="p-0">
+                                    <div className=" font-mono text-sm h-[300px] overflow-auto p-4">
+                                        <pre className="whitespace-pre-wrap">
+                                            {output.split('\n').map((line, i) => (
+                                                <div
+                                                    key={i}
+                                                    className={cn(
+                                                        "py-0.5",
+                                                        line.startsWith('>') && "text-destructive bg-destructive/10"
+                                                    )}
+                                                >
+                                                    {line}
+                                                </div>
+                                            ))}
+                                        </pre>
+                                    </div>
+                                </TabsContent>
+                                <TabsContent value="console" className="p-0">
+                                    <div className="bg-muted/50 font-mono text-sm h-[300px] overflow-auto p-4">
+                                        <pre className="whitespace-pre-wrap">
+                                            {consoleOutput.split('\n').map((line, i) => (
+                                                <div key={i} className="py-0.5">
+                                                    {line}
+                                                </div>
+                                            ))}
+                                        </pre>
+                                    </div>
+                                </TabsContent>
+                            </Tabs>
+                        </div>
                     </div>
 
-                    {/* Right Column - Code Editor and Output */}
-                    <div className="space-y-6 min-w-[800px]">
-                        <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
-                            <div className="p-4 border-b flex justify-between items-center">
-                                <Label className="text-sm font-medium">Code Editor</Label>
-                                <div className="flex gap-2">
-
+                    {/* Right Column - Code Editor */}
+                    <div className="rounded-lg border bg-card">
+                        <div className="p-4 border-b flex justify-between items-center">
+                            <Label className="text-sm font-medium">Code Editor</Label>
+                            <div className="flex gap-2">
+                                <Button
+                                    onClick={handleRunCode}
+                                    disabled={isRunning}
+                                    size="sm"
+                                    className="gap-2"
+                                >
+                                    <Play className="h-4 w-4" />
+                                    {isRunning ? 'Running...' : 'Run Code'}
+                                </Button>
+                                {watch('method') === 'GET' && (
                                     <Button
-                                        onClick={handleRunCode}
+                                        onClick={() => window.open(`/api${watch('endpoint')}`, '_blank')}
                                         disabled={isRunning}
                                         size="sm"
+                                        variant="outline"
                                         className="gap-2"
                                     >
-                                        <Play className="h-4 w-4" />
-                                        {isRunning ? 'Running...' : 'Run Code'}
+                                        Test API
                                     </Button>
-                                    {watch('method') === 'GET' && (
-                                        <Button
-                                            onClick={() => {
-                                                window.open(`/api${watch('endpoint')}`, '_blank')
-                                            }}
-                                            disabled={isRunning}
-                                            size="sm"
-                                            className="gap-2"
-                                        >
-                                            <Play className="h-4 w-4" />
-                                            Run Code in API form
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-                            <div className={cn(
-                                "h-[400px]",
-                                errors.code && "border-destructive"
-                            )}>
-                                <Editor
-                                    height="100%"
-                                    defaultLanguage="javascript"
-                                    theme="vs-dark"
-                                    value={watch('code')}
-                                    onChange={(value) => setValue('code', value || '')}
-                                    options={{
-                                        minimap: { enabled: false },
-                                        fontSize: 14,
-                                        lineNumbers: 'on',
-                                        scrollBeyondLastLine: false,
-                                        automaticLayout: true,
-                                        padding: { top: 16, bottom: 16 },
-                                    }}
-                                />
-                            </div>
-                            {errors.code && (
-                                <p className="text-sm text-destructive p-2">{errors.code.message}</p>
-                            )}
-                        </div>
-
-                        <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
-                            <div className="p-4 border-b">
-                                <Label className="text-sm font-medium">Output</Label>
-                            </div>
-                            <div className="p-4 bg-muted/50 font-mono text-sm h-[300px] overflow-auto rounded-b-lg">
-                                <pre className="whitespace-pre-wrap">
-                                    {output.split('\n').map((line, i) => (
-                                        <div
-                                            key={i}
-                                            className={cn(
-                                                "py-0.5",
-                                                line.startsWith('>') && "text-destructive bg-destructive/10"
-                                            )}
-                                        >
-                                            {line}
-                                        </div>
-                                    ))}
-                                </pre>
+                                )}
                             </div>
                         </div>
+                        <div className={cn(
+                            "h-[calc(100vh-16rem)]",
+                            errors.code && "border-destructive"
+                        )}>
+                            <Editor
+                                height="100%"
+                                defaultLanguage="javascript"
+                                theme="vs-dark"
+                                value={watch('code')}
+                                onChange={(value) => setValue('code', value || '')}
+                                options={{
+                                    minimap: { enabled: false },
+                                    fontSize: 14,
+                                    lineNumbers: 'on',
+                                    scrollBeyondLastLine: false,
+                                    automaticLayout: true,
+                                    padding: { top: 16, bottom: 16 },
+                                }}
+                            />
+                        </div>
+                        {errors.code && (
+                            <p className="text-sm text-destructive p-2">{errors.code.message}</p>
+                        )}
                     </div>
                 </div>
             </div>
