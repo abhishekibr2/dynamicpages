@@ -17,7 +17,6 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
   return new Promise((resolve, reject) => {
     const worker = new Worker(`
       const { parentPort } = require('worker_threads');
-      const axiosPromise = import('axios').then(mod => mod.default);
       // Set up logging collection
       const logs = [];
       const console = {
@@ -33,10 +32,13 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
         }
       };
 
+      // Store native fetch
+      const nativeFetch = fetch;
+
       // Set up fetch implementation in global scope using native fetch
       global.fetch = async (url, options = {}) => {
         try {
-          const res = await fetch(url, options);
+          const res = await nativeFetch(url, options);
           if (!res.ok) {
             throw new Error('HTTP error! status: ' + res.status);
           }
@@ -54,6 +56,33 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
           throw err;
         }
       };
+
+      // Provide axios-like interface using fetch
+      global.axios = {
+        request: async (config) => {
+          const options = {
+            method: config.method || 'get',
+            headers: config.headers || {},
+            body: config.data ? JSON.stringify(config.data) : undefined
+          };
+          
+          const response = await nativeFetch(config.url, options);
+          const data = await response.json();
+          
+          return {
+            data,
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers
+          };
+        },
+        get: function(url, config = {}) {
+          return this.request({ ...config, url, method: 'get' });
+        },
+        post: function(url, data, config = {}) {
+          return this.request({ ...config, url, method: 'post', data });
+        }
+      };
       
       parentPort.on('message', async ({ code, context }) => {
         try {
@@ -63,9 +92,6 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
           global.response = context.response;
           // Make data available globally for POST requests
           global.data = context.request.body?.data;
-          
-          // Make axios available in global scope
-          global.axios = await axiosPromise;
           
           // Execute the code and wait for all promises to settle
           const result = await eval(code);

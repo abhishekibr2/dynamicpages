@@ -70,7 +70,8 @@ export default function PageEditor({ params }: PageEditorProps) {
         handleSubmit: handleFormSubmit,
         formState: { errors, isDirty },
         setValue,
-        watch
+        watch,
+        reset
     } = useForm<PageFormData>({
         resolver: zodResolver(pageSchema),
         defaultValues: {
@@ -154,6 +155,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 const { id, ...newPageData } = data
                 await createPage(newPageData)
                 setInitialCode(data.code)
+                reset(data) // Reset form with current data to clear dirty state
                 setHasUnsavedChanges(false)
                 toast({
                     title: "Success",
@@ -163,6 +165,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 const { id, created_at, ...updateData } = data
                 const result = await updatePage(resolvedParams.id, updateData)
                 setInitialCode(data.code)
+                reset(data) // Reset form with current data to clear dirty state
                 setHasUnsavedChanges(false)
                 toast({
                     title: "Success",
