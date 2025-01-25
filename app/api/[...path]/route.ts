@@ -18,7 +18,7 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
     const worker = new Worker(`
       const { parentPort } = require('worker_threads');
       const nodeFetch = import('node-fetch').then(mod => mod.default);
-      const axios = require('axios');
+      const axiosPromise = import('axios').then(mod => mod.default);
       // Set up logging collection
       const logs = [];
       const console = {
@@ -65,6 +65,9 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
           global.response = context.response;
           // Make data available globally for POST requests
           global.data = context.request.body?.data;
+          
+          // Make axios available in global scope
+          global.axios = await axiosPromise;
           
           // Execute the code and wait for all promises to settle
           const result = await eval(code);
