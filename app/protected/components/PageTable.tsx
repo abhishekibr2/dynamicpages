@@ -1,7 +1,6 @@
 'use client'
 
 import { Page } from "@/types/Page"
-import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -42,30 +41,42 @@ export function PageTable() {
   return (
     <div className="rounded-md border">
       <Table>
-        <TableHeader>
+        <TableHeader className="bg-muted/100">
           <TableRow>
             <TableHead>Title</TableHead>
             <TableHead>Description</TableHead>
             <TableHead>Endpoint</TableHead>
             <TableHead>Method</TableHead>
             <TableHead>Created At</TableHead>
-            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {pages.map((page) => (
-            <TableRow key={page.id}>
-              <TableCell>{page.title}</TableCell>
-              <TableCell>{page.description}</TableCell>
-              <TableCell>{page.endpoint}</TableCell>
-              <TableCell>{page.method}</TableCell>
-              <TableCell>{moment(page.created_at).fromNow()}</TableCell>
-              <TableCell>
-
-                <Link href={`/protected/page/${page.id}`}>
-                  Edit
+            <TableRow key={page.id} className="cursor-pointer hover:bg-muted hover:rounded-md">
+              <TableCell className="p-0">
+                <Link href={`/protected/page/${page.id}`} className="block px-4 py-2">
+                  {page.title}
                 </Link>
-
+              </TableCell>
+              <TableCell className="p-0">
+                <Link href={`/protected/page/${page.id}`} className="block px-4 py-2">
+                  {page.description}
+                </Link>
+              </TableCell>
+              <TableCell className="p-0">
+                <Link href={`/protected/page/${page.id}`} className="block px-4 py-2">
+                  {page.endpoint}
+                </Link>
+              </TableCell>
+              <TableCell className="p-0">
+                <Link href={`/protected/page/${page.id}`} className="block px-4 py-2">
+                  {page.method}
+                </Link>
+              </TableCell>
+              <TableCell className="p-0">
+                <Link href={`/protected/page/${page.id}`} className="block px-4 py-2">
+                  {moment(page.created_at).fromNow()}
+                </Link>
               </TableCell>
             </TableRow>
           ))}

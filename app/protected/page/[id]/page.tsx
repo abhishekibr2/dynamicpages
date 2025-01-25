@@ -64,6 +64,8 @@ export default function PageEditor({ params }: PageEditorProps) {
     const [showUnsavedAlert, setShowUnsavedAlert] = useState(false)
     const [pendingNavigation, setPendingNavigation] = useState<'back' | 'cancel' | null>(null)
     const [initialCode, setInitialCode] = useState<string>('')
+    const [lastKeyPress, setLastKeyPress] = useState<string>('')
+    const [lastKeyPressTime, setLastKeyPressTime] = useState<number>(0)
 
     const {
         register,
@@ -90,6 +92,32 @@ export default function PageEditor({ params }: PageEditorProps) {
         const hasCodeChanges = currentCode !== initialCode
         setHasUnsavedChanges(isDirty || hasCodeChanges)
     }, [isDirty, watch('code'), initialCode])
+
+    // Add keyboard shortcut handler
+    useEffect(() => {
+        const handleKeyPress = (e: KeyboardEvent) => {
+            const currentTime = Date.now()
+            const newLastKey = e.key.toLowerCase()
+            
+            if (newLastKey === 's') {
+                const timeDiff = currentTime - lastKeyPressTime
+                if (lastKeyPress === 's' && timeDiff <= 500) {
+                    handleNavigation('back')
+                    setLastKeyPress('')
+                    setLastKeyPressTime(0)
+                } else {
+                    setLastKeyPress('s')
+                    setLastKeyPressTime(currentTime)
+                }
+            } else {
+                setLastKeyPress('')
+                setLastKeyPressTime(0)
+            }
+        }
+
+        window.addEventListener('keypress', handleKeyPress)
+        return () => window.removeEventListener('keypress', handleKeyPress)
+    }, [lastKeyPress, lastKeyPressTime])
 
     const handleCodeChange = (value: string | undefined) => {
         setValue('code', value || '', { shouldDirty: true })
@@ -320,10 +348,18 @@ export default function PageEditor({ params }: PageEditorProps) {
                     </div>
                     <div className="flex items-center gap-3">
                         <Button 
-                            variant="ghost"
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleNavigation('cancel')}
                         >
                             Cancel
+                        </Button>
+                        <Button 
+                            size="sm" 
+                            onClick={handleFormSubmit(onSubmit)}
+                            variant="default"
+                        >
+                            {isNewPage ? 'Create' : 'Save Changes'}
                         </Button>
                         {!isNewPage && (
                             <AlertDialog>
@@ -350,9 +386,6 @@ export default function PageEditor({ params }: PageEditorProps) {
                                 </AlertDialogContent>
                             </AlertDialog>
                         )}
-                        <Button size="sm" onClick={handleFormSubmit(onSubmit)}>
-                            {isNewPage ? 'Create' : 'Save Changes'}
-                        </Button>
                     </div>
                 </div>
             </div>
@@ -486,16 +519,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                     <div className="rounded-lg border bg-card">
                         <div className="p-4 border-b flex justify-between items-center">
                             <Label className="text-sm font-medium">Code Editor</Label>
-                            <div className="flex gap-2">
-                                <Button
-                                    onClick={handleRunCode}
-                                    disabled={isRunning}
-                                    size="sm"
-                                    className="gap-2"
-                                >
-                                    <Play className="h-4 w-4" />
-                                    {isRunning ? 'Running...' : 'Run Code'}
-                                </Button>
+                            <div className="flex items-center gap-2">
                                 {watch('method') === 'GET' && (
                                     <Button
                                         onClick={() => window.open(`/api${watch('endpoint')}`, '_blank')}
@@ -507,6 +531,16 @@ export default function PageEditor({ params }: PageEditorProps) {
                                         Test API
                                     </Button>
                                 )}
+                                <Button
+                                    onClick={handleRunCode}
+                                    disabled={isRunning}
+                                    size="sm"
+                                    variant="default"
+                                    className="gap-2"
+                                >
+                                    <Play className="h-4 w-4" />
+                                    {isRunning ? 'Running...' : 'Run Code'}
+                                </Button>
                             </div>
                         </div>
                         <div className={cn(
