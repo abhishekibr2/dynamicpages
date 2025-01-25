@@ -17,7 +17,6 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
   return new Promise((resolve, reject) => {
     const worker = new Worker(`
       const { parentPort } = require('worker_threads');
-      const nodeFetch = import('node-fetch').then(mod => mod.default);
       const axiosPromise = import('axios').then(mod => mod.default);
       // Set up logging collection
       const logs = [];
@@ -34,11 +33,10 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
         }
       };
 
-      // Set up fetch implementation in global scope
+      // Set up fetch implementation in global scope using native fetch
       global.fetch = async (url, options = {}) => {
         try {
-          const fetchFn = await nodeFetch;
-          const res = await fetchFn(url, options);
+          const res = await fetch(url, options);
           if (!res.ok) {
             throw new Error('HTTP error! status: ' + res.status);
           }
