@@ -15,6 +15,7 @@ import { getPages } from "@/utils/supabase/actions/page"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import moment from "moment"
 
 export function PageTable() {
   const [pages, setPages] = useState<Page[]>([])
@@ -58,7 +59,7 @@ export function PageTable() {
               <TableCell>{page.description}</TableCell>
               <TableCell>{page.endpoint}</TableCell>
               <TableCell>{page.method}</TableCell>
-              <TableCell>{new Date(page.created_at).toLocaleDateString()}</TableCell>
+              <TableCell>{moment(page.created_at).fromNow()}</TableCell>
               <TableCell>
 
                 <Link href={`/protected/page/${page.id}`}>
