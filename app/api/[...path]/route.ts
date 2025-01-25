@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runInNewContext } from 'vm'
+import { Worker } from 'worker_threads'
 import express from 'express'
 import fs from 'fs'
 import path from 'path'
@@ -16,6 +16,110 @@ import os from 'os'
 import child_process from 'child_process'
 import { getPageByEndpoint } from '@/utils/supabase/actions/page'
 import axios from 'axios'
+
+interface WorkerResponse {
+  success: boolean
+  response?: {
+    body: any
+    status: number
+    headers: Record<string, string>
+  }
+  logs: string[]
+  error?: string
+}
+
+const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Promise<WorkerResponse> => {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(`
+      const { parentPort } = require('worker_threads');
+      const nodeFetch = import('node-fetch').then(mod => mod.default);
+      
+      // Set up logging collection
+      const logs = [];
+      const console = {
+        log: (...args) => {
+          const log = args.map(arg => {
+            try {
+              return typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            } catch (e) {
+              return '[Unstringifiable Object]'
+            }
+          }).join(' ');
+          logs.push(log);
+        }
+      };
+
+      // Set up fetch implementation
+      const fetch = async (url) => {
+        try {
+          const fetchFn = await nodeFetch;
+          const res = await fetchFn(url);
+          if (!res.ok) {
+            throw new Error('HTTP error! status: ' + res.status);
+          }
+          const data = await res.json();
+          return {
+            ok: res.ok,
+            status: res.status,
+            statusText: res.statusText,
+            headers: res.headers,
+            json: () => Promise.resolve(data),
+            text: () => Promise.resolve(JSON.stringify(data))
+          };
+        } catch (err) {
+          console.log("Fetch error:", err.message);
+          throw err;
+        }
+      };
+      
+      parentPort.on('message', async ({ code, context }) => {
+        try {
+          // Set up global context
+          global.console = console;
+          global.request = context.request;
+          global.response = context.response;
+          global.fetch = fetch;
+          // Make data available globally for POST requests
+          global.data = context.request.body?.data;
+          
+          // Execute the code
+          await eval(code);
+          
+          parentPort.postMessage({ 
+            success: true, 
+            response: global.response,
+            logs
+          });
+        } catch (error) {
+          parentPort.postMessage({ 
+            success: false, 
+            error: error.message,
+            logs
+          });
+        }
+      });
+    `, { eval: true });
+
+    const timer = setTimeout(() => {
+      worker.terminate();
+      reject(new Error("Code execution timed out"));
+    }, timeout);
+
+    worker.on('message', (data) => {
+      clearTimeout(timer);
+      worker.terminate();
+      resolve(data);
+    });
+
+    worker.on('error', (error) => {
+      clearTimeout(timer);
+      worker.terminate();
+      reject(error);
+    });
+
+    worker.postMessage({ code, context });
+  });
+};
 
 // Create a modules object with commonly used modules
 const modules = {
@@ -38,20 +142,21 @@ const modules = {
 }
 
 export async function GET(request: NextRequest) {
-  return handleRequest(request, 'GET')
+  return handleRequest(request, 'GET', null)
 }
 
 export async function POST(request: NextRequest) {
-  return handleRequest(request, 'POST')
+  const data = await request.json()
+  return handleRequest(request, 'POST', data)
 }
 
-async function handleRequest(request: NextRequest, method: string) {
+async function handleRequest(request: NextRequest, method: string, data: any) {
   try {
     const pathname = request.nextUrl.pathname.split('/api/')[1]
-    const data = await request.json()
+    
+    // Safely parse request data
     console.log('Pathname:', pathname)
-    // Get the page from the database using the endpoint and method
-    console.log('Getting page by endpoint:', pathname, 'Method:', method)
+    
     const page = await getPageByEndpoint(pathname, method)
 
     if (!page) {
@@ -64,106 +169,77 @@ async function handleRequest(request: NextRequest, method: string) {
 
     console.log('Found page:', page.id)
 
-    // Create a sandbox with console.log and require
-    const sandbox = {
-      output: '',
-      data,
-      module: { exports: {} },
-      require: (moduleName: string) => {
-        if (modules.hasOwnProperty(moduleName)) {
-          return modules[moduleName as keyof typeof modules]
-        } else {
-          throw new Error(`Module '${moduleName}' is not allowed for import`)
-        }
-      },
-      console: {
-        log: (...args: any[]) => {
-          sandbox.output += args.map(arg => 
-            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
-          ).join(' ') + '\n'
-        }
-      },
-      process: {
-        ...process,
-        env: {} // Restrict access to environment variables
-      },
+    // Prepare the execution context
+    const context = {
       request: {
         method,
         url: request.url,
         headers: Object.fromEntries(request.headers),
         query: Object.fromEntries(request.nextUrl.searchParams),
-        body: method === 'POST' ? await request.json().catch(() => ({})) : undefined
+        body: method === 'POST' ? {
+          code: data.code,
+          data: data.data // This is the parsed body data from the POST request
+        } : null
       },
       response: {
         status: 200,
-        headers: {} as Record<string, string>,
-        body: null as any
+        headers: {},
+        body: null
       }
     }
 
-    try {
-      // Run the code in the sandbox
-      runInNewContext(page.code, sandbox, {
-        timeout: 5000,
-        filename: 'usercode.js'
-      })
+    // Wrap the code to handle async operations
+    const wrappedCode = `
+      (async function() {
+        try {
+          ${page.code}
+        } catch(err) {
+          console.log('Error:', err.message);
+          response.body = { error: err.message };
+          response.status = 500;
+        }
+      })();
+    `
 
-      // Allow custom response from the code
-      const response = NextResponse.json(
-        sandbox.response.body || { 
+    try {
+      const result = await executeCodeWithWorker(wrappedCode, context, 5000)
+      
+      if (!result.success) {
+        return NextResponse.json({ 
+          success: false,
+          output: result.logs.join('\n'),
+          error: result.error
+        }, { status: 400 })
+      }
+
+      return NextResponse.json(
+        (result.response?.body) || { 
           success: true,
-          data: sandbox.data,
-          output: sandbox.output || 'Code executed successfully (no output)',
+          output: result.logs.join('\n') || 'Code executed successfully (no output)',
           error: null 
         },
         { 
-          status: sandbox.response.status,
-          headers: sandbox.response.headers
+          status: result.response?.status || 200,
+          headers: result.response?.headers || {}
         }
       )
 
-      return response
     } catch (error: any) {
-      const stack = error.stack || ''
-      const lineMatch = stack.match(/usercode\.js:(\d+)/)
-      const lineNumber = lineMatch ? parseInt(lineMatch[1]) : null
-
-      const codeLines = page.code.split('\n')
-      let errorOutput = ''
-
-      if (lineNumber) {
-        const start = Math.max(0, lineNumber - 3)
-        const end = Math.min(codeLines.length, lineNumber + 2)
-        
-        const codeSnippet = codeLines
-          .slice(start, end)
-          .map((line: string, index: number) => {
-            const currentLineNum = start + index + 1
-            const isErrorLine = currentLineNum === lineNumber
-            return `${isErrorLine ? '>' : ' '} ${currentLineNum.toString().padStart(3, ' ')} | ${line}`
-          })
-          .join('\n')
-
-        errorOutput = `Error at line ${lineNumber}:\n${error.message}\n\nCode snippet:\n${codeSnippet}`
-      } else {
-        errorOutput = `Error: ${error.message}\n\nFull code:\n${codeLines.map((line: string, i: number) => 
-          ` ${(i + 1).toString().padStart(3, ' ')} | ${line}`
-        ).join('\n')}`
-      }
-
       return NextResponse.json({ 
         success: false,
         output: null,
-        error: errorOutput
+        error: `Execution Error: ${error.message}`
       }, { status: 400 })
     }
+
   } catch (error: any) {
     console.error('Server error:', error)
     return NextResponse.json(
       { 
         success: false,
         output: null,
-        error: `Server Error: ${error.message}`
+        error: `Server Error: ${error.message}`,
+        details: error.stack
       },
       { status: 500 }
     )

@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import Link from "next/link";
 import "./globals.css";
 import TopLoader from "@/utils/TopLoader";
+import { Toaster } from "@/components/ui/toaster";
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -39,7 +40,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-
+          <Toaster />
           <main className="min-h-screen flex flex-col items-center w-full">
             <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
               <div className="w-full flex justify-between items-center p-3 px-5 text-sm">

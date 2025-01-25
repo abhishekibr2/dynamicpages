@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Page } from "@/types/Page"
 import { getPage, updatePage, deletePage, createPage } from "@/utils/supabase/actions/page"
 import Editor from "@monaco-editor/react"
 import { useRouter } from "next/navigation"
@@ -29,7 +28,6 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import Link from "next/link"
 
 interface PageEditorProps {
     params: Promise<{
@@ -61,11 +59,16 @@ export default function PageEditor({ params }: PageEditorProps) {
     const [output, setOutput] = useState<string>('')
     const [consoleOutput, setConsoleOutput] = useState<string>('')
     const [isRunning, setIsRunning] = useState(false)
+    const [postBody, setPostBody] = useState<string>('{\n  \n}')
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+    const [showUnsavedAlert, setShowUnsavedAlert] = useState(false)
+    const [pendingNavigation, setPendingNavigation] = useState<'back' | 'cancel' | null>(null)
+    const [initialCode, setInitialCode] = useState<string>('')
 
     const {
         register,
         handleSubmit: handleFormSubmit,
-        formState: { errors },
+        formState: { errors, isDirty },
         setValue,
         watch
     } = useForm<PageFormData>({
@@ -80,11 +83,48 @@ export default function PageEditor({ params }: PageEditorProps) {
         }
     })
 
+    // Track unsaved changes including code editor
+    useEffect(() => {
+        const currentCode = watch('code')
+        const hasCodeChanges = currentCode !== initialCode
+        setHasUnsavedChanges(isDirty || hasCodeChanges)
+    }, [isDirty, watch('code'), initialCode])
+
+    const handleCodeChange = (value: string | undefined) => {
+        setValue('code', value || '', { shouldDirty: true })
+    }
+
+    const handleNavigation = (type: 'back' | 'cancel') => {
+        if (hasUnsavedChanges) {
+            setShowUnsavedAlert(true)
+            setPendingNavigation(type)
+        } else {
+            if (type === 'back') {
+                router.back()
+            } else {
+                router.push('/protected')
+            }
+        }
+    }
+
+    const handleNavigationConfirm = async (shouldSave: boolean) => {
+        if (shouldSave) {
+            await handleFormSubmit(onSubmit)()
+        }
+        setShowUnsavedAlert(false)
+        if (pendingNavigation === 'back') {
+            router.back()
+        } else {
+            router.push('/protected')
+        }
+    }
+
     useEffect(() => {
         if (!isNewPage) {
             fetchPage()
         } else {
             setIsLoading(false)
+            setInitialCode('')
         }
     }, [resolvedParams.id])
 
@@ -95,6 +135,7 @@ export default function PageEditor({ params }: PageEditorProps) {
             Object.entries(data).forEach(([key, value]) => {
                 setValue(key as keyof PageFormData, value as string)
             })
+            setInitialCode(data.code || '')
         } catch (error) {
             toast({
                 variant: "destructive",
@@ -112,22 +153,22 @@ export default function PageEditor({ params }: PageEditorProps) {
             if (isNewPage) {
                 const { id, ...newPageData } = data
                 await createPage(newPageData)
+                setInitialCode(data.code)
+                setHasUnsavedChanges(false)
                 toast({
                     title: "Success",
                     description: "Page created successfully",
                 })
             } else {
-                // Remove id and created_at from update data
                 const { id, created_at, ...updateData } = data
-                console.log('Updating page with data:', updateData)
                 const result = await updatePage(resolvedParams.id, updateData)
-                console.log('Update result:', result)
+                setInitialCode(data.code)
+                setHasUnsavedChanges(false)
                 toast({
                     title: "Success",
                     description: "Page updated successfully",
                 })
             }
-            router.push('/protected')
         } catch (error) {
             console.error('Update error:', error)
             toast({
@@ -164,12 +205,40 @@ export default function PageEditor({ params }: PageEditorProps) {
         setConsoleOutput('Running...')
 
         try {
-            const response = await fetch('/api/execute', {
-                method: 'POST',
+            // First save the changes
+            const formData = {
+                title: watch('title'),
+                description: watch('description'),
+                code: watch('code'),
+                endpoint: watch('endpoint'),
+                method: watch('method'),
+                created_at: watch('created_at')
+            }
+
+            if (!isNewPage) {
+                await updatePage(resolvedParams.id, formData)
+            }
+
+            // Then run the code
+            let body: any = { code }
+            if (watch('method') === 'POST') {
+                try {
+                    const parsedBody = JSON.parse(postBody)
+                    body = { ...body, data: parsedBody }
+                } catch (e) {
+                    setOutput('Error: Invalid JSON in request body')
+                    setConsoleOutput('')
+                    setIsRunning(false)
+                    return
+                }
+            }
+
+            const response = await fetch(`/api${watch('endpoint')}`, {
+                method: watch('method'),
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ code }),
+                body: JSON.stringify(body),
             })
 
             const data = await response.json()
@@ -195,6 +264,33 @@ export default function PageEditor({ params }: PageEditorProps) {
 
     return (
         <div className="min-h-screen bg-background w-full">
+            <AlertDialog open={showUnsavedAlert} onOpenChange={setShowUnsavedAlert}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            You have unsaved changes. Would you like to save before leaving?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setShowUnsavedAlert(false)}>
+                            Continue Editing
+                        </AlertDialogCancel>
+                        <Button
+                            variant="outline"
+                            onClick={() => handleNavigationConfirm(false)}
+                        >
+                            Discard Changes
+                        </Button>
+                        <Button
+                            onClick={() => handleNavigationConfirm(true)}
+                        >
+                            Save & Leave
+                        </Button>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
             {/* Header */}
             <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="w-full px-6 flex h-14 items-center justify-between">
@@ -203,19 +299,23 @@ export default function PageEditor({ params }: PageEditorProps) {
                             variant="ghost"
                             size="sm"
                             className="gap-2"
-                            onClick={() => router.back()}
+                            onClick={() => handleNavigation('back')}
                         >
                             <ArrowLeft className="h-4 w-4" />
                             Back
                         </Button>
                         <h1 className="text-xl font-semibold">
                             {isNewPage ? 'Create New Page' : 'Edit Page'}
+                            {hasUnsavedChanges && <span className="ml-2 text-sm text-muted-foreground">(Unsaved changes)</span>}
                         </h1>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Link href="/protected">
+                        <Button 
+                            variant="ghost"
+                            onClick={() => handleNavigation('cancel')}
+                        >
                             Cancel
-                        </Link>
+                        </Button>
                         {!isNewPage && (
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
@@ -328,6 +428,16 @@ export default function PageEditor({ params }: PageEditorProps) {
                                             <p className="text-sm text-destructive">{errors.method.message}</p>
                                         )}
                                     </div>
+                                    {watch('method') === 'POST' && (
+                                    <div className="flex-1 max-w-[300px]">
+                                        <Textarea 
+                                            value={postBody}
+                                            onChange={(e) => setPostBody(e.target.value)}
+                                            placeholder="Enter JSON request body"
+                                            className="h-[200px] font-mono text-sm"
+                                        />
+                                    </div>
+                                )}
                                 </div>
                             </div>
                         </div>
@@ -348,28 +458,14 @@ export default function PageEditor({ params }: PageEditorProps) {
                                 <TabsContent value="execution" className="p-0">
                                     <div className=" font-mono text-sm h-[300px] overflow-auto p-4">
                                         <pre className="whitespace-pre-wrap">
-                                            {output.split('\n').map((line, i) => (
-                                                <div
-                                                    key={i}
-                                                    className={cn(
-                                                        "py-0.5",
-                                                        line.startsWith('>') && "text-destructive bg-destructive/10"
-                                                    )}
-                                                >
-                                                    {line}
-                                                </div>
-                                            ))}
+                                            {output}
                                         </pre>
                                     </div>
                                 </TabsContent>
                                 <TabsContent value="console" className="p-0">
                                     <div className="bg-muted/50 font-mono text-sm h-[300px] overflow-auto p-4">
                                         <pre className="whitespace-pre-wrap">
-                                            {consoleOutput.split('\n').map((line, i) => (
-                                                <div key={i} className="py-0.5">
-                                                    {line}
-                                                </div>
-                                            ))}
+                                            {consoleOutput}
                                         </pre>
                                     </div>
                                 </TabsContent>
@@ -413,7 +509,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                                 defaultLanguage="javascript"
                                 theme="vs-dark"
                                 value={watch('code')}
-                                onChange={(value) => setValue('code', value || '')}
+                                onChange={handleCodeChange}
                                 options={{
                                     minimap: { enabled: false },
                                     fontSize: 14,
