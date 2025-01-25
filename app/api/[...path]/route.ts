@@ -1,21 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Worker } from 'worker_threads'
-import express from 'express'
-import fs from 'fs'
-import path from 'path'
-import http from 'http'
-import https from 'https'
-import url from 'url'
-import querystring from 'querystring'
-import crypto from 'crypto'
-import util from 'util'
-import events from 'events'
-import stream from 'stream'
-import zlib from 'zlib'
-import os from 'os'
-import child_process from 'child_process'
 import { getPageByEndpoint } from '@/utils/supabase/actions/page'
-import axios from 'axios'
 
 interface WorkerResponse {
   success: boolean
@@ -33,7 +18,7 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
     const worker = new Worker(`
       const { parentPort } = require('worker_threads');
       const nodeFetch = import('node-fetch').then(mod => mod.default);
-      
+      const axios = require('axios');
       // Set up logging collection
       const logs = [];
       const console = {
@@ -49,11 +34,11 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
         }
       };
 
-      // Set up fetch implementation
-      const fetch = async (url) => {
+      // Set up fetch implementation in global scope
+      global.fetch = async (url, options = {}) => {
         try {
           const fetchFn = await nodeFetch;
-          const res = await fetchFn(url);
+          const res = await fetchFn(url, options);
           if (!res.ok) {
             throw new Error('HTTP error! status: ' + res.status);
           }
@@ -78,12 +63,19 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
           global.console = console;
           global.request = context.request;
           global.response = context.response;
-          global.fetch = fetch;
           // Make data available globally for POST requests
           global.data = context.request.body?.data;
           
-          // Execute the code
-          await eval(code);
+          // Execute the code and wait for all promises to settle
+          const result = await eval(code);
+          
+          // If the result is a promise, wait for it
+          if (result && typeof result.then === 'function') {
+            await result;
+          }
+          
+          // Add a small delay to ensure any floating promises are settled
+          await new Promise(resolve => setTimeout(resolve, 2500));
           
           parentPort.postMessage({ 
             success: true, 
@@ -120,26 +112,6 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
     worker.postMessage({ code, context });
   });
 };
-
-// Create a modules object with commonly used modules
-const modules = {
-  express,
-  fs,
-  path,
-  http,
-  https,
-  url,
-  querystring,
-  crypto,
-  util,
-  events,
-  stream,
-  zlib,
-  os,
-  child_process,
-  fetch,
-  axios
-}
 
 export async function GET(request: NextRequest) {
   return handleRequest(request, 'GET', null)
