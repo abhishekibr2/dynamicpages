@@ -12,7 +12,7 @@ export const getPage = async (pageId: string) => {
 
 export const getPages = async () => {
     const supabase = createClient();
-    const { data, error } = await supabase.from('pages').select('*');
+    const { data, error } = await supabase.from('pages').select('*').order('created_at', { ascending: false });
     if (error) {
         throw new Error('Failed to fetch pages');
     }

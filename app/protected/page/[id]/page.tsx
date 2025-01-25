@@ -153,7 +153,9 @@ export default function PageEditor({ params }: PageEditorProps) {
         try {
             if (isNewPage) {
                 const { id, ...newPageData } = data
-                await createPage(newPageData)
+                const result = await createPage(newPageData)
+                const newPageId = result[0].id
+                router.replace(`/protected/page/${newPageId}`)
                 setInitialCode(data.code)
                 reset(data) // Reset form with current data to clear dirty state
                 setHasUnsavedChanges(false)

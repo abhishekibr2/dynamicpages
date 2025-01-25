@@ -216,7 +216,7 @@ async function handleRequest(request: NextRequest, method: string, data: any) {
           success: true,
           output: result.logs.join('\n') || 'Code executed successfully (no output)',
           error: null 
-        },
+        },  
         { 
           status: result.response?.status || 200,
           headers: result.response?.headers || {}
