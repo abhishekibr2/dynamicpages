@@ -220,11 +220,22 @@ export default function PageEditor({ params }: PageEditorProps) {
             }
 
             // Then run the code
-            let body: any = { code }
-            if (watch('method') === 'POST') {
+            const method = watch('method')
+            const requestConfig: RequestInit = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            }
+
+            // Only add body for POST requests
+            if (method === 'POST') {
                 try {
                     const parsedBody = JSON.parse(postBody)
-                    body = { ...body, data: parsedBody }
+                    requestConfig.body = JSON.stringify({ 
+                        code,
+                        data: parsedBody 
+                    })
                 } catch (e) {
                     setOutput('Error: Invalid JSON in request body')
                     setConsoleOutput('')
@@ -233,14 +244,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 }
             }
 
-            const response = await fetch(`/api${watch('endpoint')}`, {
-                method: watch('method'),
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(body),
-            })
-
+            const response = await fetch(`/api${watch('endpoint')}`, requestConfig)
             const data = await response.json()
 
             if (data.error) {
