@@ -1,0 +1,16 @@
+export const availableColors = [
+    'red',
+    'green',
+    'blue',
+    'yellow',
+    'purple',
+    'pink',
+    'orange',
+    'gray',
+    'teal',
+    'indigo',
+    'cyan',
+    'violet',
+    'fuchsia',
+    'rose',
+]
