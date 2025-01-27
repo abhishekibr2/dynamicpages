@@ -1,11 +1,9 @@
 'use client'
 
 import { PageTable } from "./components/PageTable"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 
 export default function ProtectedPage() {
-  const router = useRouter()
 
   return (
     <div className="container mx-auto py-10 space-y-4">
@@ -15,8 +13,8 @@ export default function ProtectedPage() {
           <Link href="/protected/page/new" className="bg-primary hover:bg-primary/90 text-background px-4 py-2 rounded-md">
             Create New Page
           </Link>
-          <Link href="/protected/category" className="bg-primary hover:bg-primary/90 text-background px-4 py-2 rounded-md">
-            Categories
+          <Link href="/protected/pre-defined-vars" className="bg-primary hover:bg-primary/90 text-background px-4 py-2 rounded-md">
+            Pre-defined Variables
           </Link>
         </div>
       </div>

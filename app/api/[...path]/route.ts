@@ -11,6 +11,8 @@ interface WorkerResponse {
   }
   logs: string[]
   error?: string
+  result: any
+  lineNumber?: number
 }
 
 const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Promise<WorkerResponse> => {
@@ -23,9 +25,9 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
         log: (...args) => {
           const log = args.map(arg => {
             try {
-              return typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+              return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
             } catch (e) {
-              return '[Unstringifiable Object]'
+              return '[Unstringifiable Object]';
             }
           }).join(' ');
           logs.push(log);
@@ -97,9 +99,7 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
           const result = await eval(code);
           
           // If the result is a promise, wait for it
-          if (result && typeof result.then === 'function') {
-            await result;
-          }
+          const finalResult = result && typeof result.then === 'function' ? await result : result;
           
           // Add a small delay to ensure any floating promises are settled
           await new Promise(resolve => setTimeout(resolve, 2500));
@@ -107,13 +107,30 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
           parentPort.postMessage({ 
             success: true, 
             response: global.response,
-            logs
+            logs,
+            result: finalResult
           });
         } catch (error) {
+          // Extract line number from error stack if available
+          let lineNumber = null;
+          if (error.stack) {
+            const stackLines = error.stack.split('\\\\n');
+            const evalLine = stackLines.find(line => line.includes('<anonymous>'));
+            if (evalLine) {
+              const match = evalLine.match(/<anonymous>:(\\\\d+):\\\\d+/);
+              if (match) {
+                lineNumber = parseInt(match[1], 10);
+                // Adjust line number to account for our wrapper function
+                lineNumber = Math.max(1, lineNumber - 2);
+              }
+            }
+          }
+          
           parentPort.postMessage({ 
             success: false, 
-            error: error.message,
-            logs
+            error: \`\${error.message}\${lineNumber ? \` (Line \${lineNumber})\` : ''}\`,
+            logs,
+            lineNumber
           });
         }
       });
@@ -124,13 +141,13 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
       reject(new Error("Code execution timed out"));
     }, timeout);
 
-    worker.on('message', (data) => {
+    worker.on('message', (result: WorkerResponse) => {
       clearTimeout(timer);
       worker.terminate();
-      resolve(data);
+      resolve(result);
     });
 
-    worker.on('error', (error) => {
+    worker.on('error', (error: Error) => {
       clearTimeout(timer);
       worker.terminate();
       reject(error);
@@ -191,11 +208,15 @@ async function handleRequest(request: NextRequest, method: string, data: any) {
     const wrappedCode = `
       (async function() {
         try {
-          ${page.code}
+          const result = await (async () => {
+            ${page.code}
+          })();
+          return result;
         } catch(err) {
           console.log('Error:', err.message);
           response.body = { error: err.message };
           response.status = 500;
+          return err.message;
         }
       })();
     `
@@ -214,7 +235,8 @@ async function handleRequest(request: NextRequest, method: string, data: any) {
       return NextResponse.json(
         (result.response?.body) || { 
           success: true,
-          output: result.logs.join('\n') || 'Code executed successfully (no output)',
+          output: result.result,
+          logs: result.logs.join('\n') || 'No console output',
           error: null 
         },  
         { 

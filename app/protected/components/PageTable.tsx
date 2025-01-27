@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import moment from "moment"
+import SkeletonTable from "@/components/skeleton-table"
 
 export function PageTable() {
   const [pages, setPages] = useState<Page[]>([])
@@ -37,6 +38,11 @@ export function PageTable() {
   useEffect(() => {
     fetchPages()
   }, [])
+
+
+  if (pages.length === 0) {
+    return <SkeletonTable />
+  }
 
   return (
     <div className="rounded-md border">

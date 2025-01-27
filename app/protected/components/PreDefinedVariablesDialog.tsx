@@ -10,62 +10,65 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { Category } from "@/types/Category"
-import { createCategory, updateCategory } from "@/utils/supabase/actions/category"
+import { PreDefinedVariable } from "@/types/PreDefinedVariable"
+import { createPreDefinedVariable, updatePreDefinedVariable } from "@/utils/supabase/actions/preDefinedVars"
 import { useState, useEffect } from "react"
 import { availableColors } from "@/utils/colors"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import Editor from "@monaco-editor/react"
+import { useTheme } from "next-themes"
 
-interface CategoryDialogProps {
-    category?: Category
+interface PreDefinedVariableDialogProps {
+    preDefinedVariable?: PreDefinedVariable
     open: boolean
     onOpenChange: (open: boolean) => void
     onSuccess: () => void
 }
 
-export function CategoryDialog({
-    category,
+export function PreDefinedVariableDialog({
+    preDefinedVariable,
     open,
     onOpenChange,
     onSuccess,
-}: CategoryDialogProps) {
-    const [formData, setFormData] = useState<Partial<Category>>({
+}: PreDefinedVariableDialogProps) {
+    const [formData, setFormData] = useState<Partial<PreDefinedVariable>>({
         title: '',
-        vars: '',
+        vars: [] as string[],
         color: availableColors[0],
     })
     const { toast } = useToast()
+    const { theme } = useTheme()
 
     useEffect(() => {
-        if (category) {
+        if (preDefinedVariable) {
             setFormData({
-                title: category.title,
-                vars: category.vars,
-                color: category.color,
+                title: preDefinedVariable.title,
+                vars: preDefinedVariable.vars,
+                color: preDefinedVariable.color,
             })
         } else {
             setFormData({
                 title: '',
-                vars: '',
+                vars: [] as string[],
                 color: availableColors[0],
             })
         }
-    }, [category])
+    }, [preDefinedVariable])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         try {
-            if (category) {
-                await updateCategory(category.id, formData as Category)
+            if (preDefinedVariable) {
+                await updatePreDefinedVariable(preDefinedVariable.id, formData as PreDefinedVariable)
                 toast({
                     title: "Success",
-                    description: "Category updated successfully",
+                    description: "Pre-defined variable updated successfully",
                 })
             } else {
-                await createCategory(formData as Category)
+                await createPreDefinedVariable(formData as PreDefinedVariable)
                 toast({
                     title: "Success",
-                    description: "Category created successfully",
+                    description: "Pre-defined variable created successfully",
                 })
             }
             onSuccess()
@@ -74,7 +77,7 @@ export function CategoryDialog({
             toast({
                 variant: "destructive",
                 title: "Error",
-                description: category ? "Failed to update category" : "Failed to create category",
+                description: preDefinedVariable ? "Failed to update pre-defined variable" : "Failed to create pre-defined variable",
             })
         }
     }
@@ -83,7 +86,7 @@ export function CategoryDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{category ? 'Edit Category' : 'Create Category'}</DialogTitle>
+                    <DialogTitle>{preDefinedVariable ? 'Edit Pre-defined Variable' : 'Create Pre-defined Variable'}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
@@ -98,21 +101,34 @@ export function CategoryDialog({
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="vars">Variables (comma separated)</Label>
-                        <Input
-                            id="vars"
-                            value={formData.vars}
-                            onChange={(e) =>
-                                setFormData({ ...formData, vars: e.target.value })
-                            }
-                            placeholder="var1,var2,var3"
-                            required
-                        />
+                        <Label htmlFor="vars">Variables (one per line)</Label>
+                        <div className="border rounded-md">
+                            <Editor
+                                height="200px"
+                                defaultLanguage="javascript"
+                                theme={`vs-${theme}`}
+                                value={Array.isArray(formData.vars) ? formData.vars.join('\n') : ''}
+                                onChange={(value) =>
+                                    setFormData({
+                                        ...formData,
+                                        vars: value ? value.split('\n').filter(v => v.trim() !== '') : []
+                                    })
+                                }
+                                options={{
+                                    minimap: { enabled: false },
+                                    lineNumbers: 'on',
+                                    scrollBeyondLastLine: false,
+                                    wordWrap: 'on',
+                                    wrappingStrategy: 'advanced',
+                                    fontSize: 14,
+                                }}
+                            />
+                        </div>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="color">Color</Label>
-                        <Select 
-                            value={formData.color} 
+                        <Select
+                            value={formData.color}
                             onValueChange={(value) => setFormData({ ...formData, color: value })}
                         >
                             <SelectTrigger>
@@ -122,8 +138,8 @@ export function CategoryDialog({
                                 {availableColors.map((color) => (
                                     <SelectItem key={color} value={color}>
                                         <div className="flex items-center gap-2">
-                                            <div 
-                                                className="w-4 h-4 rounded-full" 
+                                            <div
+                                                className="w-4 h-4 rounded-full"
                                                 style={{ backgroundColor: color }}
                                             />
                                             {color}
@@ -142,7 +158,7 @@ export function CategoryDialog({
                             Cancel
                         </Button>
                         <Button type="submit">
-                            {category ? 'Update' : 'Create'}
+                            {preDefinedVariable ? 'Update' : 'Create'}
                         </Button>
                     </div>
                 </form>
