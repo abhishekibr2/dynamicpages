@@ -28,6 +28,14 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command"
+import { Check } from "lucide-react"
+import { getPreDefinedVariables } from "@/utils/supabase/actions/preDefinedVars"
+import { PreDefinedVariableDialog } from "../../components/PreDefinedVariablesDialog"
+import { PreDefinedVariable } from "@/types/PreDefinedVariable"
+import { useTheme } from "next-themes"
+import SkeletonPage from "@/components/skeleton-page"
 
 interface PageEditorProps {
     params: Promise<{
@@ -45,7 +53,8 @@ const pageSchema = z.object({
         invalid_type_error: "Method must be either GET or POST"
     }),
     created_at: z.string(),
-    id: z.string().optional()
+    id: z.string().optional(),
+    preDefinedVariables: z.number().nullable()
 })
 
 type PageFormData = z.infer<typeof pageSchema>
@@ -58,6 +67,7 @@ export default function PageEditor({ params }: PageEditorProps) {
     const isNewPage = resolvedParams.id === 'new'
     const [output, setOutput] = useState<string>('')
     const [consoleOutput, setConsoleOutput] = useState<string>('')
+    const [returnValue, setReturnValue] = useState<string>('')
     const [isRunning, setIsRunning] = useState(false)
     const [postBody, setPostBody] = useState<string>('{\n  \n}')
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -66,7 +76,12 @@ export default function PageEditor({ params }: PageEditorProps) {
     const [initialCode, setInitialCode] = useState<string>('')
     const [lastKeyPress, setLastKeyPress] = useState<string>('')
     const [lastKeyPressTime, setLastKeyPressTime] = useState<number>(0)
-
+    const [editorErrors, setEditorErrors] = useState<string[]>([])
+    const [preDefinedVariables, setPreDefinedVariables] = useState<PreDefinedVariable[]>([])
+    const [showPreDefinedVarDialog, setShowPreDefinedVarDialog] = useState(false)
+    const [selectedPreDefinedVar, setSelectedPreDefinedVar] = useState<PreDefinedVariable | undefined>(undefined)
+    const [selectedVarCode, setSelectedVarCode] = useState<string>('')
+    const { theme } = useTheme()
     const {
         register,
         handleSubmit: handleFormSubmit,
@@ -82,7 +97,8 @@ export default function PageEditor({ params }: PageEditorProps) {
             code: '',
             endpoint: '',
             method: 'GET',
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            preDefinedVariables: null
         }
     })
 
@@ -98,7 +114,7 @@ export default function PageEditor({ params }: PageEditorProps) {
         const handleKeyPress = (e: KeyboardEvent) => {
             const currentTime = Date.now()
             const newLastKey = e.key.toLowerCase()
-            
+
             if (newLastKey === 's') {
                 const timeDiff = currentTime - lastKeyPressTime
                 if (lastKeyPress === 's' && timeDiff <= 500) {
@@ -119,8 +135,39 @@ export default function PageEditor({ params }: PageEditorProps) {
         return () => window.removeEventListener('keypress', handleKeyPress)
     }, [lastKeyPress, lastKeyPressTime])
 
+    // Effect to fetch and update selected predefined variable's code
+    useEffect(() => {
+        const fetchSelectedVarCode = async () => {
+            const selectedVarId = watch('preDefinedVariables')
+            if (selectedVarId !== null) {
+                const selectedVar = preDefinedVariables.find(v => Number(v.id) === selectedVarId)
+                if (selectedVar && selectedVar.vars) {
+                    // Join the vars array with newlines
+                    const varsCode = selectedVar.vars.join('\n')
+                    setSelectedVarCode(varsCode)
+                } else {
+                    setSelectedVarCode('')
+                }
+            } else {
+                setSelectedVarCode('')
+            }
+        }
+        fetchSelectedVarCode()
+    }, [watch('preDefinedVariables'), preDefinedVariables])
+
     const handleCodeChange = (value: string | undefined) => {
-        setValue('code', value || '', { shouldDirty: true })
+        // Only update the user's code part, preserving the predefined vars
+        const userCode = value || ''
+        setValue('code', userCode, { shouldDirty: true })
+    }
+
+    // Function to get the full code including predefined vars
+    const getFullCode = () => {
+        const userCode = watch('code')
+        if (selectedVarCode) {
+            return `${selectedVarCode}\n\n${userCode}`
+        }
+        return userCode
     }
 
     const handleNavigation = (type: 'back' | 'cancel') => {
@@ -157,12 +204,32 @@ export default function PageEditor({ params }: PageEditorProps) {
         }
     }, [resolvedParams.id])
 
+    useEffect(() => {
+        const fetchPreDefinedVars = async () => {
+            try {
+                const vars = await getPreDefinedVariables()
+                setPreDefinedVariables(vars)
+            } catch (error) {
+                toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: "Failed to fetch pre-defined variables",
+                })
+            }
+        }
+        fetchPreDefinedVars()
+    }, [])
+
     const fetchPage = async () => {
         try {
             const data = await getPage(resolvedParams.id)
             // Set form values
             Object.entries(data).forEach(([key, value]) => {
-                setValue(key as keyof PageFormData, value as string)
+                if (key === 'preDefinedVariables') {
+                    setValue(key, value ? Number(value) : null)
+                } else {
+                    setValue(key as keyof PageFormData, value as string)
+                }
             })
             setInitialCode(data.code || '')
         } catch (error) {
@@ -181,11 +248,14 @@ export default function PageEditor({ params }: PageEditorProps) {
         try {
             if (isNewPage) {
                 const { id, ...newPageData } = data
-                const result = await createPage(newPageData)
+                const result = await createPage({
+                    ...newPageData,
+                    preDefinedVariables: newPageData.preDefinedVariables ? Number(newPageData.preDefinedVariables) : null
+                })
                 const newPageId = result[0].id
                 router.replace(`/protected/page/${newPageId}`)
                 setInitialCode(data.code)
-                reset(data) // Reset form with current data to clear dirty state
+                reset(data)
                 setHasUnsavedChanges(false)
                 toast({
                     title: "Success",
@@ -193,9 +263,12 @@ export default function PageEditor({ params }: PageEditorProps) {
                 })
             } else {
                 const { id, created_at, ...updateData } = data
-                const result = await updatePage(resolvedParams.id, updateData)
+                await updatePage(resolvedParams.id, {
+                    ...updateData,
+                    preDefinedVariables: updateData.preDefinedVariables ? Number(updateData.preDefinedVariables) : null
+                })
                 setInitialCode(data.code)
-                reset(data) // Reset form with current data to clear dirty state
+                reset(data)
                 setHasUnsavedChanges(false)
                 toast({
                     title: "Success",
@@ -236,6 +309,7 @@ export default function PageEditor({ params }: PageEditorProps) {
         setIsRunning(true)
         setOutput('Running...')
         setConsoleOutput('Running...')
+        setReturnValue('Running...')
 
         try {
             // First save the changes
@@ -245,7 +319,8 @@ export default function PageEditor({ params }: PageEditorProps) {
                 code: watch('code'),
                 endpoint: watch('endpoint'),
                 method: watch('method'),
-                created_at: watch('created_at')
+                created_at: watch('created_at'),
+                preDefinedVariables: watch('preDefinedVariables')
             }
 
             if (!isNewPage) {
@@ -265,13 +340,14 @@ export default function PageEditor({ params }: PageEditorProps) {
             if (method === 'POST') {
                 try {
                     const parsedBody = JSON.parse(postBody)
-                    requestConfig.body = JSON.stringify({ 
+                    requestConfig.body = JSON.stringify({
                         code,
-                        data: parsedBody 
+                        data: parsedBody
                     })
                 } catch (e) {
                     setOutput('Error: Invalid JSON in request body')
                     setConsoleOutput('')
+                    setReturnValue('')
                     setIsRunning(false)
                     return
                 }
@@ -281,22 +357,48 @@ export default function PageEditor({ params }: PageEditorProps) {
             const data = await response.json()
 
             if (data.error) {
-                setOutput(data.error)
-                setConsoleOutput('')
+                const errorMessage = data.error
+                const lineNumber = data.lineNumber
+                setOutput(lineNumber ? `Error at line ${lineNumber}: ${errorMessage}` : errorMessage)
+                setConsoleOutput(errorMessage || '')
+                setReturnValue('')
             } else {
-                setOutput(data.output)
-                setConsoleOutput(data.consoleOutput)
+                setOutput(data.output !== undefined ? JSON.stringify(data.output, null, 2) : 'No return value')
+                setConsoleOutput(data.logs || '')
+                setReturnValue(data.output !== undefined ? JSON.stringify(data.output, null, 2) : 'No return value')
             }
         } catch (error) {
-            setOutput(`Error: ${error}`)
+            setOutput(`Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`)
             setConsoleOutput('')
+            setReturnValue('')
         } finally {
             setIsRunning(false)
         }
     }
 
+    const handleEditorValidation = (markers: any[]) => {
+        const errors = markers
+            .filter(marker => marker.severity === 8) // Error severity
+            .map(marker => `Line ${marker.startLineNumber}: ${marker.message}`);
+        setEditorErrors(errors);
+    };
+
+    const handlePreDefinedVarSuccess = async () => {
+        // Refresh the predefined variables list
+        try {
+            const vars = await getPreDefinedVariables()
+            setPreDefinedVariables(vars)
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to refresh pre-defined variables",
+            })
+        }
+    }
+
     if (isLoading) {
-        return <div>Loading...</div>
+        return <SkeletonPage />
     }
 
     return (
@@ -347,15 +449,15 @@ export default function PageEditor({ params }: PageEditorProps) {
                         </h1>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Button 
+                        <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleNavigation('cancel')}
                         >
                             Cancel
                         </Button>
-                        <Button 
-                            size="sm" 
+                        <Button
+                            size="sm"
                             onClick={handleFormSubmit(onSubmit)}
                             variant="default"
                         >
@@ -471,66 +573,109 @@ export default function PageEditor({ params }: PageEditorProps) {
                                         )}
                                     </div>
                                     {watch('method') === 'POST' && (
-                                    <div className="flex-1 max-w-[300px]">
-                                        <Textarea 
-                                            value={postBody}
-                                            onChange={(e) => setPostBody(e.target.value)}
-                                            placeholder="Enter JSON request body"
-                                            className="h-[200px] font-mono text-sm"
-                                        />
+                                        <div className="flex-1 max-w-[300px]">
+                                            <Textarea
+                                                value={postBody}
+                                                onChange={(e) => setPostBody(e.target.value)}
+                                                placeholder="Enter JSON request body"
+                                                className="h-[200px] font-mono text-sm"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id="usePreDefinedVars"
+                                                checked={watch('preDefinedVariables') !== null}
+                                                onCheckedChange={(checked) => {
+                                                    if (!checked) {
+                                                        setValue('preDefinedVariables', null, { shouldDirty: true });
+                                                    } else if (preDefinedVariables.length > 0) {
+                                                        setValue('preDefinedVariables', Number(preDefinedVariables[0].id), { shouldDirty: true });
+                                                    }
+                                                }}
+                                            />
+                                            <Label htmlFor="usePreDefinedVars">Use Pre-defined Variables</Label>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                setSelectedPreDefinedVar(undefined)
+                                                setShowPreDefinedVarDialog(true)
+                                            }}
+                                        >
+                                            Add New Variable
+                                        </Button>
                                     </div>
-                                )}
+                                    {watch('preDefinedVariables') !== null && (
+                                        <Command className="border rounded-md">
+                                            <CommandInput placeholder="Search pre-defined variables..." />
+                                            <CommandList>
+                                                <CommandEmpty>No results found.</CommandEmpty>
+                                                <CommandGroup>
+                                                    {preDefinedVariables.map((variable) => (
+                                                        <CommandItem
+                                                            key={variable.id}
+                                                            onSelect={() => {
+                                                                setValue('preDefinedVariables', Number(variable.id), { shouldDirty: true });
+                                                            }}
+                                                            className="flex items-center gap-2 cursor-pointer"
+                                                        >
+                                                            <div
+                                                                className="w-3 h-3 rounded-full"
+                                                                style={{ backgroundColor: variable.color }}
+                                                            />
+                                                            <span>{variable.title}</span>
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="ml-2"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedPreDefinedVar({
+                                                                        ...variable,
+                                                                        vars: variable.vars || '',
+                                                                        created_at: variable.created_at || new Date().toISOString()
+                                                                    });
+                                                                    setShowPreDefinedVarDialog(true);
+                                                                }}
+                                                            >
+                                                                Edit
+                                                            </Button>
+                                                            {watch('preDefinedVariables') === Number(variable.id) && (
+                                                                <Check className="ml-auto h-4 w-4" />
+                                                            )}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    )}
                                 </div>
                             </div>
                         </div>
-
-                        {/* Output Sections */}
-                        <div className="rounded-lg border">
-                            <Tabs defaultValue="execution" className="w-full ">
-                                <div className="flex items-center justify-between border-b px-3 py-2">
-                                    <TabsList className="h-12 bg-transparent">
-                                        <TabsTrigger value="execution" className="">
-                                            Execution Output
-                                        </TabsTrigger>
-                                        <TabsTrigger value="console" className="">
-                                            Console Output
-                                        </TabsTrigger>
-                                    </TabsList>
-                                </div>
-                                <TabsContent value="execution" className="p-0">
-                                    <div className=" font-mono text-sm h-[300px] overflow-auto p-4">
-                                        <pre className="whitespace-pre-wrap">
-                                            {output}
-                                        </pre>
-                                    </div>
-                                </TabsContent>
-                                <TabsContent value="console" className="p-0">
-                                    <div className="bg-muted/50 font-mono text-sm h-[300px] overflow-auto p-4">
-                                        <pre className="whitespace-pre-wrap">
-                                            {consoleOutput}
-                                        </pre>
-                                    </div>
-                                </TabsContent>
-                            </Tabs>
-                        </div>
                     </div>
 
-                    {/* Right Column - Code Editor */}
+                    {/* Right Column - Tabs with Code Editor, Return Value, and Console Output */}
                     <div className="rounded-lg border bg-card">
-                        <div className="p-4 border-b flex justify-between items-center">
-                            <Label className="text-sm font-medium">Code Editor</Label>
-                            <div className="flex items-center gap-2">
-                                {watch('method') === 'GET' && (
-                                    <Button
-                                        onClick={() => window.open(`/api${watch('endpoint')}`, '_blank')}
-                                        disabled={isRunning}
-                                        size="sm"
-                                        variant="outline"
-                                        className="gap-2"
-                                    >
-                                        Test API
-                                    </Button>
-                                )}
+                        <Tabs defaultValue="code" className="w-full">
+                            <div className="flex items-center justify-between border-b px-3 py-2">
+                                <TabsList className="h-12 bg-transparent">
+                                    <TabsTrigger value="code" className="">
+                                        Code Editor
+                                    </TabsTrigger>
+                                    <TabsTrigger value="return" className="">
+                                        Return Value
+                                    </TabsTrigger>
+                                    <TabsTrigger value="console" className="">
+                                        Console Output
+                                    </TabsTrigger>
+                                </TabsList>
                                 <Button
                                     onClick={handleRunCode}
                                     disabled={isRunning}
@@ -542,33 +687,73 @@ export default function PageEditor({ params }: PageEditorProps) {
                                     {isRunning ? 'Running...' : 'Run Code'}
                                 </Button>
                             </div>
-                        </div>
-                        <div className={cn(
-                            "h-[calc(100vh-16rem)]",
-                            errors.code && "border-destructive"
-                        )}>
-                            <Editor
-                                height="100%"
-                                defaultLanguage="javascript"
-                                theme="vs-dark"
-                                value={watch('code')}
-                                onChange={handleCodeChange}
-                                options={{
-                                    minimap: { enabled: false },
-                                    fontSize: 14,
-                                    lineNumbers: 'on',
-                                    scrollBeyondLastLine: false,
-                                    automaticLayout: true,
-                                    padding: { top: 16, bottom: 16 },
-                                }}
-                            />
-                        </div>
-                        {errors.code && (
-                            <p className="text-sm text-destructive p-2">{errors.code.message}</p>
-                        )}
+
+                            <TabsContent value="code" className="p-0">
+                                <div className={cn(
+                                    "h-[calc(100vh-16rem)]",
+                                    errors.code && "border-destructive"
+                                )}>
+                                    <Editor
+                                        height="100%"
+                                        defaultLanguage="javascript"
+                                        theme={`vs-${theme}`}
+                                        value={getFullCode()}
+                                        onChange={handleCodeChange}
+                                        options={{
+                                            minimap: { enabled: false },
+                                            fontSize: 14,
+                                            lineNumbers: 'on',
+                                            scrollBeyondLastLine: false,
+                                            automaticLayout: true,
+                                            padding: { top: 16, bottom: 16 },
+                                        }}
+                                        onValidate={handleEditorValidation}
+                                    />
+                                </div>
+                                {errors.code && (
+                                    <p className="text-sm p-2">{errors.code.message}</p>
+                                )}
+                                {editorErrors.length > 0 && (
+                                    <div className="p-2 border border-destructive rounded-b-lg bg-destructive/10">
+                                        <div className="text-sm p-2 space-y-1">
+                                            <p className="font-medium">Validation Errors:</p>
+                                            {editorErrors.map((error, index) => (
+                                                <p key={index}>{error}</p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {output && output.includes('Error:') && (
+                                    <p className="text-sm p-2">{output}</p>
+                                )}
+                            </TabsContent>
+
+                            <TabsContent value="return" className="p-0">
+                                <div className="font-mono text-sm h-[calc(100vh-16rem)] overflow-auto p-4">
+                                    <pre className="whitespace-pre-wrap">
+                                        {returnValue}
+                                    </pre>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="console" className="p-0">
+                                <div className="bg-muted/50 font-mono text-sm h-[calc(100vh-16rem)] overflow-auto p-4">
+                                    <pre className="whitespace-pre-wrap">
+                                        {consoleOutput}
+                                    </pre>
+                                </div>
+                            </TabsContent>
+                        </Tabs>
                     </div>
                 </div>
             </div>
+
+            <PreDefinedVariableDialog
+                open={showPreDefinedVarDialog}
+                onOpenChange={setShowPreDefinedVarDialog}
+                preDefinedVariable={selectedPreDefinedVar}
+                onSuccess={handlePreDefinedVarSuccess}
+            />
         </div>
     )
 }

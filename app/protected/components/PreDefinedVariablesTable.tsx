@@ -1,6 +1,6 @@
 'use client'
 
-import { Category } from "@/types/Category"
+import { PreDefinedVariable } from "@/types/PreDefinedVariable"
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useState, useEffect, forwardRef, useImperativeHandle } from "react"
-import { getCategories, deleteCategory } from "@/utils/supabase/actions/category"
+import { getPreDefinedVariables, deletePreDefinedVariable } from "@/utils/supabase/actions/preDefinedVars"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Pencil, Trash2 } from "lucide-react"
@@ -24,77 +24,82 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import SkeletonTable from "@/components/skeleton-table"
 
-interface CategoryTableProps {
-  onEdit: (category: Category) => void;
+interface PreDefinedVariableTableProps {
+  onEdit: (preDefinedVariable: PreDefinedVariable) => void;
   onAddNew: () => void;
 }
 
-export interface CategoryTableRef {
-  fetchCategories: () => void;
+export interface PreDefinedVariableTableRef {
+  fetchPreDefinedVariables: () => void;
 }
 
-const CategoryTableComponent = forwardRef<CategoryTableRef, CategoryTableProps>(
+const PreDefinedVariableTableComponent = forwardRef<PreDefinedVariableTableRef, PreDefinedVariableTableProps>(
   ({ onEdit, onAddNew }, ref) => {
-    const [categories, setCategories] = useState<Category[]>([])
+    const [preDefinedVariables, setPreDefinedVariables] = useState<PreDefinedVariable[]>([])
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-    const [categoryToDelete, setCategoryToDelete] = useState<string>()
+    const [preDefinedVariableToDelete, setPreDefinedVariableToDelete] = useState<string>()
     const { toast } = useToast()
 
-    const fetchCategories = async () => {
+    const fetchPreDefinedVariables = async () => {
       try {
-        const data = await getCategories()
-        setCategories(data)
+        const data = await getPreDefinedVariables()
+        setPreDefinedVariables(data)
       } catch (error) {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Failed to fetch categories",
+          description: "Failed to fetch pre-defined variables",
         })
       }
     }
 
     useImperativeHandle(ref, () => ({
-      fetchCategories
+      fetchPreDefinedVariables
     }))
 
     const handleDeleteClick = (id: string) => {
-      setCategoryToDelete(id)
+      setPreDefinedVariableToDelete(id)
       setDeleteDialogOpen(true)
     }
 
     const handleDeleteConfirm = async () => {
-      if (!categoryToDelete) return
+      if (!preDefinedVariableToDelete) return
 
       try {
-        await deleteCategory(categoryToDelete)
+        await deletePreDefinedVariable(preDefinedVariableToDelete)
         toast({
           title: "Success",
-          description: "Category deleted successfully",
+          description: "Pre-defined variable deleted successfully",
         })
-        fetchCategories()
+        fetchPreDefinedVariables()
       } catch (error) {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Failed to delete category",
+          description: "Failed to delete pre-defined variable",
         })
       } finally {
         setDeleteDialogOpen(false)
-        setCategoryToDelete(undefined)
+        setPreDefinedVariableToDelete(undefined)
       }
     }
 
     useEffect(() => {
-      fetchCategories()
+      fetchPreDefinedVariables()
     }, [])
+
+    if (preDefinedVariables.length === 0) {
+      return <SkeletonTable />
+    }
 
     return (
       <>
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">Categories</h2>
-            <Button onClick={onAddNew}>Add New Category</Button>
+            <h2 className="text-2xl font-bold">Pre-defined Variables</h2>
+            <Button onClick={onAddNew}>Add New Pre-defined Variable</Button>
           </div>
           <div className="rounded-md border">
             <Table>
@@ -108,33 +113,33 @@ const CategoryTableComponent = forwardRef<CategoryTableRef, CategoryTableProps>(
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {categories.map((category) => (
-                  <TableRow key={category.id}>
-                    <TableCell>{category.title}</TableCell>
-                    <TableCell>{category.vars}</TableCell>
+                {preDefinedVariables.map((preDefinedVariable) => (
+                  <TableRow key={preDefinedVariable.id}>
+                    <TableCell>{preDefinedVariable.title}</TableCell>
+                    <TableCell>{preDefinedVariable.vars && preDefinedVariable.vars.length > 0 ? preDefinedVariable.vars.join(', ') : 'No variables'}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <div 
-                          className="w-4 h-4 rounded-full" 
-                          style={{ backgroundColor: category.color }}
+                        <div
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: preDefinedVariable.color }}
                         />
-                        {category.color}
+                        {preDefinedVariable.color}
                       </div>
                     </TableCell>
-                    <TableCell>{new Date(category.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(preDefinedVariable.created_at).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => onEdit(category)}
+                          onClick={() => onEdit(preDefinedVariable)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteClick(category.id)}
+                          onClick={() => handleDeleteClick(preDefinedVariable.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -152,7 +157,7 @@ const CategoryTableComponent = forwardRef<CategoryTableRef, CategoryTableProps>(
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the category.
+                This action cannot be undone. This will permanently delete the pre-defined variable.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -166,6 +171,6 @@ const CategoryTableComponent = forwardRef<CategoryTableRef, CategoryTableProps>(
   }
 )
 
-CategoryTableComponent.displayName = 'CategoryTable'
+PreDefinedVariableTableComponent.displayName = 'PreDefinedVariableTable'
 
-export const CategoryTable = CategoryTableComponent 
+export const PreDefinedVariableTable = PreDefinedVariableTableComponent 

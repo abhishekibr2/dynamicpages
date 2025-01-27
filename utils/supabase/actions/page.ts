@@ -24,10 +24,10 @@ export const getPageByEndpoint = async (endpoint: string, method: string) => {
     const { data, error } = await supabase
         .from('pages')
         .select('*')
-        .eq('endpoint', "/"+endpoint)
+        .eq('endpoint', "/" + endpoint)
         .eq('method', method.toUpperCase())
         .single();
-    
+
     if (error) {
         if (error.code === 'PGRST116') {
             // No rows returned
@@ -49,14 +49,19 @@ export const createPage = async (page: Omit<Page, 'id'>) => {
 };
 
 export const updatePage = async (pageId: string, page: Partial<Page>) => {
-    const supabase = createClient();
-    const { id, ...updateData } = page; // Remove id from update data
-    const { data, error } = await supabase.from('pages').update(updateData).eq('id', pageId).select();
-    if (error) {
+    try {
+        const supabase = createClient();
+        const { id, ...updateData } = page; // Remove id from update data
+        const { data, error } = await supabase.from('pages').update(updateData).eq('id', pageId).select();
+        if (error) {
+            console.error(error);
+            throw new Error('Failed to update page');
+        }
+        return data;
+    } catch (error) {
         console.error(error);
-        throw new Error('Failed to update page');
+        return null;
     }
-    return data;
 };
 
 export const deletePage = async (pageId: string) => {

@@ -6,4 +6,5 @@ export type Page = {
     endpoint: string;
     created_at: string;
     method: string;
+    preDefinedVariables: number | null;
 };

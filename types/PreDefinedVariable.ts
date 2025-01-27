@@ -1,7 +1,7 @@
-export type Category = {
+export interface PreDefinedVariable {
     id: string;
     title: string;
-    vars: string;
+    vars: string[];
     color: string;
     created_at: string;
 }
