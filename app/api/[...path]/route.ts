@@ -59,32 +59,38 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
         }
       };
 
-      // Provide axios-like interface using fetch
-      global.axios = {
-        request: async (config) => {
-          const options = {
-            method: config.method || 'get',
-            headers: config.headers || {},
-            body: config.data ? JSON.stringify(config.data) : undefined
-          };
-          
-          const response = await nativeFetch(config.url, options);
-          const data = await response.json();
-          
-          return {
-            data,
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers
-          };
-        },
-        get: function(url, config = {}) {
-          return this.request({ ...config, url, method: 'get' });
-        },
-        post: function(url, data, config = {}) {
-          return this.request({ ...config, url, method: 'post', data });
-        }
+      // Create axios-like interface without requiring axios
+      const createAxiosLike = () => {
+        const axiosLike = {
+          request: async (config) => {
+            const options = {
+              method: config.method || 'get',
+              headers: config.headers || {},
+              body: config.data ? JSON.stringify(config.data) : undefined
+            };
+            
+            const response = await nativeFetch(config.url, options);
+            const data = await response.json();
+            
+            return {
+              data,
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers
+            };
+          },
+          get: function(url, config = {}) {
+            return this.request({ ...config, url, method: 'get' });
+          },
+          post: function(url, data, config = {}) {
+            return this.request({ ...config, url, method: 'post', data });
+          }
+        };
+        return axiosLike;
       };
+
+      // Set up global axios
+      global.axios = createAxiosLike();
       
       parentPort.on('message', async ({ code, context }) => {
         try {

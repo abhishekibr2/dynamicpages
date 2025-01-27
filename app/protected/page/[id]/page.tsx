@@ -101,6 +101,7 @@ export default function PageEditor({ params }: PageEditorProps) {
             preDefinedVariables: null
         }
     })
+    const [userCode, setUserCode] = useState<string>('')
 
     // Track unsaved changes including code editor
     useEffect(() => {
@@ -142,31 +143,46 @@ export default function PageEditor({ params }: PageEditorProps) {
             if (selectedVarId !== null) {
                 const selectedVar = preDefinedVariables.find(v => Number(v.id) === selectedVarId)
                 if (selectedVar && selectedVar.vars) {
-                    // Join the vars array with newlines
                     const varsCode = selectedVar.vars.join('\n')
                     setSelectedVarCode(varsCode)
-                } else {
-                    setSelectedVarCode('')
+                    
+                    // Get the current code without any previous predefined vars
+                    const currentCode = userCode
+                    const previousVarsCode = selectedVarCode
+                    let cleanCode = currentCode
+                    if (previousVarsCode) {
+                        cleanCode = currentCode.replace(previousVarsCode, '').trim()
+                        // Remove extra newlines at the start
+                        cleanCode = cleanCode.replace(/^\n+/, '')
+                    }
+                    
+                    // Add the new vars at the top
+                    const newCode = varsCode + (cleanCode ? '\n\n' + cleanCode : '')
+                    setUserCode(newCode)
+                    setValue('code', newCode, { shouldDirty: true })
                 }
             } else {
+                // If no variables selected, remove the previous vars
+                const previousVarsCode = selectedVarCode
+                if (previousVarsCode && userCode.includes(previousVarsCode)) {
+                    const cleanCode = userCode.replace(previousVarsCode, '').trim()
+                    setUserCode(cleanCode)
+                    setValue('code', cleanCode, { shouldDirty: true })
+                }
                 setSelectedVarCode('')
             }
         }
         fetchSelectedVarCode()
-    }, [watch('preDefinedVariables'), preDefinedVariables])
+    }, [watch('preDefinedVariables')])
 
     const handleCodeChange = (value: string | undefined) => {
-        // Only update the user's code part, preserving the predefined vars
-        const userCode = value || ''
-        setValue('code', userCode, { shouldDirty: true })
+        const newValue = value || ''
+        setUserCode(newValue)
+        setValue('code', newValue, { shouldDirty: true })
     }
 
-    // Function to get the full code including predefined vars
+    // Function to get the full code
     const getFullCode = () => {
-        const userCode = watch('code')
-        if (selectedVarCode) {
-            return `${selectedVarCode}\n\n${userCode}`
-        }
         return userCode
     }
 
@@ -201,6 +217,7 @@ export default function PageEditor({ params }: PageEditorProps) {
         } else {
             setIsLoading(false)
             setInitialCode('')
+            setUserCode('')
         }
     }, [resolvedParams.id])
 
@@ -223,11 +240,30 @@ export default function PageEditor({ params }: PageEditorProps) {
     const fetchPage = async () => {
         try {
             const data = await getPage(resolvedParams.id)
+            // First set the existing code
+            const existingCode = data.code || ''
+            setUserCode(existingCode)
+            setValue('code', existingCode)
+            
             // Set form values
             Object.entries(data).forEach(([key, value]) => {
                 if (key === 'preDefinedVariables') {
                     setValue(key, value ? Number(value) : null)
-                } else {
+                    // If there are predefined variables, add them at the top
+                    if (value) {
+                        const selectedVar = preDefinedVariables.find(v => Number(v.id) === Number(value))
+                        if (selectedVar && selectedVar.vars) {
+                            const varsCode = selectedVar.vars.join('\n')
+                            setSelectedVarCode(varsCode)
+                            // Only add vars if they're not already present
+                            if (!existingCode.includes(varsCode)) {
+                                const newCode = varsCode + (existingCode ? '\n\n' + existingCode : '')
+                                setUserCode(newCode)
+                                setValue('code', newCode)
+                            }
+                        }
+                    }
+                } else if (key !== 'code') { // Skip code as we handled it above
                     setValue(key as keyof PageFormData, value as string)
                 }
             })
@@ -243,6 +279,26 @@ export default function PageEditor({ params }: PageEditorProps) {
             setIsLoading(false)
         }
     }
+
+    // Add an effect to handle initial loading of predefined variables
+    useEffect(() => {
+        if (preDefinedVariables.length > 0 && !isNewPage) {
+            const selectedVarId = watch('preDefinedVariables')
+            if (selectedVarId !== null) {
+                const selectedVar = preDefinedVariables.find(v => Number(v.id) === selectedVarId)
+                if (selectedVar && selectedVar.vars) {
+                    const varsCode = selectedVar.vars.join('\n')
+                    setSelectedVarCode(varsCode)
+                    const currentCode = watch('code')
+                    if (!currentCode.includes(varsCode)) {
+                        const newCode = varsCode + (currentCode ? '\n\n' + currentCode : '')
+                        setUserCode(newCode)
+                        setValue('code', newCode, { shouldDirty: true })
+                    }
+                }
+            }
+        }
+    }, [preDefinedVariables])
 
     const onSubmit = async (data: PageFormData) => {
         try {
@@ -757,3 +813,4 @@ export default function PageEditor({ params }: PageEditorProps) {
         </div>
     )
 }
+
