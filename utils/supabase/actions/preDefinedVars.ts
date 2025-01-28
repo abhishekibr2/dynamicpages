@@ -11,11 +11,12 @@ export const getPreDefinedVariables = async (): Promise<PreDefinedVariable[]> =>
     return data;
 };
 
-export const getPreDefinedVariable = async (id: string): Promise<PreDefinedVariable> => {
+export const getPreDefinedVariable = async (id: string): Promise<PreDefinedVariable | null> => {
     const supabase = createClient();
     const { data, error } = await supabase.from('pre_defined_variables').select('*').eq('id', id).single();
     if (error) {
-        throw new Error('Failed to fetch pre-defined variable');
+        console.error(error);
+        return null;
     }
     return data;
 };
