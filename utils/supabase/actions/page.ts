@@ -78,6 +78,8 @@ export const addLog = async (pageId: string, log: {
     output: string;
     console: string;
     returnValue: string;
+    request: string;
+    success: boolean;
 }) => {
     const supabase = createClient();
     
@@ -124,6 +126,8 @@ export const getLogs = async (pageId: string) => {
         output: string;
         console: string;
         returnValue: string;
+        request: string;
+        success: boolean;
     }[];
 };
 
