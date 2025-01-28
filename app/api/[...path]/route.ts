@@ -83,7 +83,7 @@ const executeCodeInVM = (code: string, context: any, timeout = 5000, extractedVa
       const preDefinedVars = extractedVars ? extractedVars.join('\n') : ''
       let requestDataString;
       try {
-        requestDataString = requestData?.data;
+        requestDataString = requestData;
         const data = requestDataString ? JSON.stringify(requestDataString) : 'null'
         const wrappedCode = `
           (async function() {
@@ -235,6 +235,7 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
     }
 
     try {
+      console.log(data)
       const result = await executeCodeInVM(page.code, context, 5000, extractedVars, data)
 
       // Store logs asynchronously without waiting
