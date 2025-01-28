@@ -176,13 +176,14 @@ export async function POST(request: NextRequest) {
 
 async function handleRequest(request: NextRequest, method: string, data: any | null, preDefinedVariables: string | null) {
   let page;
+  let logEntry = null;
+  
   try {
     const pathname = request.nextUrl.pathname.split('/api/')[1]
-
     page = await getPageByEndpoint(pathname, method)
 
     if (!page) {
-      const notFoundLog = {
+      logEntry = {
         timestamp: new Date().toISOString(),
         output: 'Endpoint not found',
         console: '',
@@ -196,13 +197,6 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
         success: false
       }
       
-      // Store the not found error
-      if (page?.id) {
-        addLog(page.id, notFoundLog).catch(error => {
-          console.error('Failed to store not found log:', error)
-        })
-      }
-
       return NextResponse.json(
         { error: 'Endpoint not found' },
         { status: 404 }
@@ -234,88 +228,52 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
       extractedVars = preDefinedVariable?.vars || null
     }
 
-    try {
-      console.log(data)
-      const result = await executeCodeInVM(page.code, context, 5000, extractedVars, data)
+    const result = await executeCodeInVM(page.code, context, 5000, extractedVars, data)
 
-      // Store logs asynchronously without waiting
-      const logEntry = {
-        timestamp: new Date().toISOString(),
-        output: result.success 
-          ? (result.result ? JSON.stringify(result.result) : '') 
-          : (result.error || 'Execution failed'),
-        console: result.logs.join('\n') || '',
-        returnValue: result.success 
-          ? (result.result ? JSON.stringify(result.result) : '') 
-          : result.error || 'Error',
-        request: JSON.stringify({
-          method,
-          url: request.url,
-          query: Object.fromEntries(request.nextUrl.searchParams),
-          body: method === 'POST' ? data : null
-        }),
-        success: result.success
-      }
+    // Create log entry for any case (success or failure)
+    logEntry = {
+      timestamp: new Date().toISOString(),
+      output: result.success 
+        ? (result.result ? JSON.stringify(result.result) : '') 
+        : (result.error || 'Execution failed'),
+      console: result.logs.join('\n') || '',
+      returnValue: result.success 
+        ? (result.result ? JSON.stringify(result.result) : '') 
+        : result.error || 'Error',
+      request: JSON.stringify({
+        method,
+        url: request.url,
+        query: Object.fromEntries(request.nextUrl.searchParams),
+        body: method === 'POST' ? data : null
+      }),
+      success: result.success
+    }
 
-      // Fire and forget log storage
-      addLog(page.id, logEntry).catch(error => {
-        console.error('Failed to store logs:', error)
-      })
-
-      if (!result.success) {
-        return NextResponse.json({
-          success: false,
-          output: result.logs.join('\n'),
-          error: result.error,
-          logs: result.logs
-        }, { status: 400 })
-      }
-
-      return NextResponse.json(
-        (result.response?.body) || {
-          success: true,
-          output: result.result,
-          logs: result.logs.join('\n') || 'No console output',
-          error: null
-        },
-        {
-          status: result.response?.status || 200,
-          headers: result.response?.headers || {}
-        }
-      )
-
-    } catch (error: any) {
-      // Store error logs asynchronously without waiting
-      const errorLogEntry = {
-        timestamp: new Date().toISOString(),
-        output: error.message || "Error in execution",
-        console: error.stack || error.message,
-        returnValue: error.message || 'Error',
-        request: JSON.stringify({
-          method,
-          url: request.url,
-          query: Object.fromEntries(request.nextUrl.searchParams),
-          body: method === 'POST' ? data : null
-        }),
-        success: false
-      }
-
-      // Fire and forget error log storage
-      addLog(page.id, errorLogEntry).catch(error => {
-        console.error('Failed to store error logs:', error)
-      })
-
+    if (!result.success) {
       return NextResponse.json({
         success: false,
-        output: error.message || null,
-        error: `Execution Error: ${error.message}`,
-        logs: [error.message, error.stack].filter(Boolean)
+        output: result.logs.join('\n'),
+        error: result.error,
+        logs: result.logs
       }, { status: 400 })
     }
 
+    return NextResponse.json(
+      (result.response?.body) || {
+        success: true,
+        output: result.result,
+        logs: result.logs.join('\n') || 'No console output',
+        error: null
+      },
+      {
+        status: result.response?.status || 200,
+        headers: result.response?.headers || {}
+      }
+    )
+
   } catch (error: any) {
-    // Store internal server error logs
-    const serverErrorLog = {
+    // Create log entry for server error
+    logEntry = {
       timestamp: new Date().toISOString(),
       output: `Server Error: ${error.message}`,
       console: error.stack || error.message,
@@ -329,12 +287,6 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
       success: false
     }
 
-    if (page?.id) {
-      addLog(page.id, serverErrorLog).catch(error => {
-        console.error('Failed to store server error log:', error)
-      })
-    }
-
     return NextResponse.json(
       {
         success: false,
@@ -345,5 +297,14 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
       },
       { status: 500 }
     )
+  } finally {
+    // Store log entry only once at the end of the request
+    if (logEntry && page?.id) {
+      try {
+        await addLog(page.id, logEntry)
+      } catch (error) {
+        console.error('Failed to store log:', error)
+      }
+    }
   }
 } 
