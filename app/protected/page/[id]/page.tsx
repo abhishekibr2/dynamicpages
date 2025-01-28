@@ -897,6 +897,11 @@ export default function PageEditor({ params }: PageEditorProps) {
                                     <TabsTrigger value="variables">
                                         Pre-defined Variables
                                     </TabsTrigger>
+                                    {watch('method') === 'POST' && (
+                                        <TabsTrigger value="request">
+                                            Request Body ( Testing )
+                                        </TabsTrigger>
+                                    )}
                                 </TabsList>
                             </div>
 
@@ -1004,6 +1009,58 @@ export default function PageEditor({ params }: PageEditorProps) {
                                         )}
                                     </div>
                                 </TabsContent>
+
+                                {watch('method') === 'POST' && (
+                                    <TabsContent value="request" className="p-4 m-0 h-full">
+                                        <div className="space-y-4 h-full flex flex-col">
+                                            <div className="relative flex-1">
+                                                <Label className="mb-2 block">Request Body (JSON)</Label>
+                                                <div className="h-[calc(100%-2rem)] relative">
+                                                    <Editor
+                                                        height="100%"
+                                                        defaultLanguage="json"
+                                                        theme={`vs-${theme}`}
+                                                        value={postBody}
+                                                        onChange={(value) => setPostBody(value || '')}
+                                                        options={{
+                                                            minimap: { enabled: false },
+                                                            fontSize: 14,
+                                                            lineNumbers: 'on',
+                                                            scrollBeyondLastLine: false,
+                                                            automaticLayout: true,
+                                                            padding: { top: 16, bottom: 16 },
+                                                            wordWrap: 'on',
+                                                            scrollbar: {
+                                                                alwaysConsumeMouseWheel: false,
+                                                            },
+                                                            formatOnPaste: true,
+                                                            formatOnType: true
+                                                        }}
+                                                    />
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="absolute bottom-2 right-2 z-10"
+                                                        onClick={() => {
+                                                            try {
+                                                                const formatted = JSON.stringify(JSON.parse(postBody), null, 2)
+                                                                setPostBody(formatted)
+                                                            } catch (error) {
+                                                                toast({
+                                                                    variant: "destructive",
+                                                                    title: "Invalid JSON",
+                                                                    description: "Please enter valid JSON to format",
+                                                                })
+                                                            }
+                                                        }}
+                                                    >
+                                                        Format JSON
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+                                )}
                             </div>
                         </Tabs>
                     </div>
@@ -1064,47 +1121,6 @@ export default function PageEditor({ params }: PageEditorProps) {
                             <ExternalLink className="h-4 w-4" />
                             Test in Browser (Hoppscotch)
                         </Button>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="postBody">Request Body (JSON)</Label>
-                            <div className="relative">
-                                <Textarea
-                                    id="postBody"
-                                    value={postBody}
-                                    onChange={(e) => {
-                                        setPostBody(e.target.value)
-                                        // Try to validate JSON
-                                        try {
-                                            JSON.parse(e.target.value)
-                                        } catch (error) {
-                                            // Invalid JSON, but we don't need to show an error
-                                            // as this is just for editing
-                                        }
-                                    }}
-                                    placeholder="Enter JSON request body"
-                                    className="h-[200px] font-mono text-sm"
-                                />
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="absolute bottom-2 right-2"
-                                    onClick={() => {
-                                        try {
-                                            const formatted = JSON.stringify(JSON.parse(postBody), null, 2)
-                                            setPostBody(formatted)
-                                        } catch (error) {
-                                            toast({
-                                                variant: "destructive",
-                                                title: "Invalid JSON",
-                                                description: "Please enter valid JSON to format",
-                                            })
-                                        }
-                                    }}
-                                >
-                                    Format JSON
-                                </Button>
-                            </div>
-                        </div>
 
                         <Button
                             onClick={() => {
