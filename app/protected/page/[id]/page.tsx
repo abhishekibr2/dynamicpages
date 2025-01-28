@@ -153,11 +153,11 @@ export default function PageEditor({ params }: PageEditorProps) {
                 const current = currentFormState.preDefinedVariables;
                 const initial = initialFormState.preDefinedVariables;
                 return (current === null && initial !== null) ||
-                       (current !== null && initial === null) ||
-                       (current !== initial);
+                    (current !== null && initial === null) ||
+                    (current !== initial);
             }
-            return JSON.stringify(currentFormState[key]) !== 
-                   JSON.stringify(initialFormState[key]);
+            return JSON.stringify(currentFormState[key]) !==
+                JSON.stringify(initialFormState[key]);
         });
 
         setHasUnsavedChanges(hasChanges);
@@ -296,7 +296,7 @@ export default function PageEditor({ params }: PageEditorProps) {
             setActualCode(existingCode)
             setUserCode(existingCode)
             setValue('code', existingCode)
-            
+
             // Set form values and track initial state
             const initialState = {
                 title: data.title || '',
@@ -312,7 +312,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                     success: log.success || false
                 }))
             };
-            
+
             // Set all form values
             Object.entries(initialState).forEach(([key, value]) => {
                 if (key === 'preDefinedVariables') {
@@ -364,7 +364,7 @@ export default function PageEditor({ params }: PageEditorProps) {
         try {
             // Use actual code without predefined variables for saving
             const codeToSave = getActualCodeForSaving()
-            
+
             if (isNewPage) {
                 const { id, ...newPageData } = data
                 const result = await createPage({
@@ -379,7 +379,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 })
                 const newPageId = result[0].id
                 router.replace(`/protected/page/${newPageId}`)
-                
+
                 // Update initial state after successful save
                 const savedState = {
                     ...newPageData,
@@ -394,7 +394,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 setInitialFormState(savedState);
                 setInitialCode(codeToSave)
                 setHasUnsavedChanges(false)
-                
+
                 toast({
                     title: "Success",
                     description: "Page created successfully",
@@ -411,7 +411,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                         success: log.success || false
                     }))
                 })
-                
+
                 // Update initial state after successful save
                 const savedState = {
                     ...updateData,
@@ -427,7 +427,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 setInitialFormState(savedState);
                 setInitialCode(codeToSave)
                 setHasUnsavedChanges(false)
-                
+
                 toast({
                     title: "Success",
                     description: "Page updated successfully",
@@ -689,18 +689,6 @@ export default function PageEditor({ params }: PageEditorProps) {
                                 )}
                             </div>
                         </div>
-
-                        {watch('method') === 'POST' && (
-                            <div className="space-y-2">
-                                <Label>Request Body</Label>
-                                <Textarea
-                                    value={postBody}
-                                    onChange={(e) => setPostBody(e.target.value)}
-                                    placeholder="Enter JSON request body"
-                                    className="h-[200px] font-mono text-sm"
-                                />
-                            </div>
-                        )}
                     </div>
                 </DialogContent>
             </Dialog>
@@ -820,7 +808,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                             {selectedVarCode && (
                                 <div className="flex-none p-2 bg-muted/50 border-b">
                                     <pre className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                        {"//to change the predefined variables, click on setting and then on the variable you want to change\n\n"+selectedVarCode}
+                                        {"//to change the predefined variables, click on setting and then on the variable you want to change\n\n" + selectedVarCode}
                                     </pre>
                                 </div>
                             )}
@@ -923,8 +911,8 @@ export default function PageEditor({ params }: PageEditorProps) {
                                 </TabsContent>
 
                                 <TabsContent value="logs" className="p-4 m-0 h-full">
-                                    <LogsViewer 
-                                        logs={watch('logs') || []} 
+                                    <LogsViewer
+                                        logs={watch('logs') || []}
                                         pageId={resolvedParams.id}
                                         onLogsCleared={() => {
                                             setValue('logs', [], { shouldDirty: true })
@@ -1086,28 +1074,51 @@ export default function PageEditor({ params }: PageEditorProps) {
                     <div className="flex flex-col gap-4 py-4">
                         <Button
                             onClick={() => {
-                                const url = getEndpointUrl()
+                                const url = getEndpointUrl();
                                 try {
                                     // Parse and re-stringify to ensure valid JSON
-                                    const parsedBody = JSON.parse(postBody)
-                                    const formattedBody = JSON.stringify({
-                                        data: parsedBody
-                                    })
-                                    
-                                    // Create the base64 encoded body
-                                    const encodedBody = btoa(formattedBody)
-                                    
-                                    // Create the Hoppscotch URL with properly encoded parameters
-                                    const hoppscotchUrl = `https://hoppscotch.io/`
-                                    const params = new URLSearchParams({
-                                        method: 'POST',
-                                        url: url,
-                                        headers: JSON.stringify({ "Content-Type": "application/json" }),
-                                        body: encodedBody
-                                    })
-                                    
-                                    window.open(`${hoppscotchUrl}?${params.toString()}`, '_blank')
-                                    setShowPostEndpointDialog(false)
+                                    const parsedBody = JSON.parse(postBody);
+                                    const formattedBody = JSON.stringify({ data: parsedBody });
+
+                                    // Create Postman collection data
+                                    const postmanData = {
+                                        info: {
+                                            name: watch('title') || 'API Request',
+                                            schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+                                        },
+                                        item: [{
+                                            name: watch('title') || 'API Request',
+                                            request: {
+                                                method: 'POST',
+                                                header: [
+                                                    {
+                                                        key: 'Content-Type',
+                                                        value: 'application/json'
+                                                    }
+                                                ],
+                                                url: {
+                                                    raw: url,
+                                                    protocol: window.location.protocol.replace(':', ''),
+                                                    host: window.location.host.split('.'),
+                                                    path: url.replace(/^https?:\/\/[^\/]+/, '').split('/')
+                                                },
+                                                body: {
+                                                    mode: 'raw',
+                                                    raw: formattedBody,
+                                                    options: {
+                                                        raw: {
+                                                            language: 'json'
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }]
+                                    };
+
+                                    // Create Postman URL with the correct format
+                                    const postmanUrl = `https://go.postman.co/import?input=${encodeURIComponent(JSON.stringify(postmanData))}`;
+                                    window.open(postmanUrl, '_blank');
+                                    setShowPostEndpointDialog(false);
                                 } catch (error) {
                                     toast({
                                         variant: "destructive",
@@ -1119,7 +1130,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                             className="gap-2"
                         >
                             <ExternalLink className="h-4 w-4" />
-                            Test in Browser (Hoppscotch)
+                            Test in Postman
                         </Button>
 
                         <Button
