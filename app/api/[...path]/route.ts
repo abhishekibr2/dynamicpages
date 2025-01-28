@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Worker } from 'worker_threads'
-import { getPageByEndpoint } from '@/utils/supabase/actions/page'
+import { Script, createContext } from 'vm'
+import { getPageByEndpoint, addLog } from '@/utils/supabase/actions/page'
+import { getPreDefinedVariable } from '@/utils/supabase/actions/preDefinedVars'
 
-interface WorkerResponse {
+interface ExecutionResponse {
   success: boolean
   response?: {
     body: any
@@ -11,65 +12,41 @@ interface WorkerResponse {
   }
   logs: string[]
   error?: string
-  result: any
-  lineNumber?: number
+  result?: any
+  lineNumber?: number | null
 }
 
-const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Promise<WorkerResponse> => {
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(`
-      const { parentPort } = require('worker_threads');
+
+const executeCodeInVM = (code: string, context: any, timeout = 5000, extractedVars: string[] | null): Promise<ExecutionResponse> => {
+  return new Promise((resolve) => {
+    try {
       // Set up logging collection
-      const logs = [];
-      const console = {
-        log: (...args) => {
-          const log = args.map(arg => {
-            try {
-              return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
-            } catch (e) {
-              return '[Unstringifiable Object]';
-            }
-          }).join(' ');
-          logs.push(log);
-        }
-      };
-
-      // Store native fetch
-      const nativeFetch = fetch;
-
-      // Set up fetch implementation in global scope using native fetch
-      global.fetch = async (url, options = {}) => {
-        try {
-          const res = await nativeFetch(url, options);
-          if (!res.ok) {
-            throw new Error('HTTP error! status: ' + res.status);
+      const logs: string[] = [];
+      // Create VM context with necessary globals
+      const vmContext = createContext({
+        console: {
+          log: (...args: any[]) => {
+            const log = args.map(arg => {
+              try {
+                return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+              } catch (e) {
+                return '[Unstringifiable Object]';
+              }
+            }).join(' ');
+            logs.push(log);
           }
-          const data = await res.json();
-          return {
-            ok: res.ok,
-            status: res.status,
-            statusText: res.statusText,
-            headers: res.headers,
-            json: () => Promise.resolve(data),
-            text: () => Promise.resolve(JSON.stringify(data))
-          };
-        } catch (err) {
-          console.log("Fetch error:", err.message);
-          throw err;
-        }
-      };
-
-      // Create axios-like interface without requiring axios
-      const createAxiosLike = () => {
-        const axiosLike = {
-          request: async (config) => {
+        },
+        fetch: global.fetch,
+        // Create axios-like interface
+        axios: {
+          async request(config: any) {
             const options = {
               method: config.method || 'get',
               headers: config.headers || {},
               body: config.data ? JSON.stringify(config.data) : undefined
             };
             
-            const response = await nativeFetch(config.url, options);
+            const response = await fetch(config.url, options);
             const data = await response.json();
             
             return {
@@ -79,117 +56,108 @@ const executeCodeWithWorker = (code: string, context: any, timeout = 5000): Prom
               headers: response.headers
             };
           },
-          get: function(url, config = {}) {
+          get(url: string, config = {}) {
             return this.request({ ...config, url, method: 'get' });
           },
-          post: function(url, data, config = {}) {
+          post(url: string, data: any, config = {}) {
             return this.request({ ...config, url, method: 'post', data });
           }
-        };
-        return axiosLike;
-      };
+        },
+        request: context.request,
+        response: context.response,
+        data: context.request.body?.data,
+        setTimeout,
+        clearTimeout,
+        Promise
+      });
+      console.log(extractedVars)
+      const preDefinedVars = extractedVars ? extractedVars.join('\n') : ''
+      console.log(preDefinedVars)
+      // Wrap the code to handle async operations
+      const wrappedCode = `
+        (async function() {
+          try {
+            const result = await (async () => {
+              ${preDefinedVars}
+              ${code}
+            })();
+            return result;
+          } catch(err) {
+            console.log('Error:', err.message);
+            response.body = { error: err.message };
+            response.status = 500;
+            return err.message;
+          }
+        })();
+      `;
 
-      // Set up global axios
-      global.axios = createAxiosLike();
-      
-      parentPort.on('message', async ({ code, context }) => {
-        try {
-          // Set up global context
-          global.console = console;
-          global.request = context.request;
-          global.response = context.response;
-          // Make data available globally for POST requests
-          global.data = context.request.body?.data;
-          
-          // Execute the code and wait for all promises to settle
-          const result = await eval(code);
-          
-          // If the result is a promise, wait for it
-          const finalResult = result && typeof result.then === 'function' ? await result : result;
-          
-          // Add a small delay to ensure any floating promises are settled
-          await new Promise(resolve => setTimeout(resolve, 2500));
-          
-          parentPort.postMessage({ 
-            success: true, 
-            response: global.response,
+      // Create and run script
+      const script = new Script(wrappedCode);
+      const result = script.runInContext(vmContext, { timeout });
+
+      // Handle Promise result
+      Promise.resolve(result)
+        .then((finalResult) => {
+          resolve({
+            success: true,
+            response: vmContext.response,
             logs,
             result: finalResult
           });
-        } catch (error) {
-          // Extract line number from error stack if available
+        })
+        .catch((error) => {
           let lineNumber = null;
           if (error.stack) {
-            const stackLines = error.stack.split('\\\\n');
-            const evalLine = stackLines.find(line => line.includes('<anonymous>'));
-            if (evalLine) {
-              const match = evalLine.match(/<anonymous>:(\\\\d+):\\\\d+/);
-              if (match) {
-                lineNumber = parseInt(match[1], 10);
-                // Adjust line number to account for our wrapper function
-                lineNumber = Math.max(1, lineNumber - 2);
-              }
+            const match = error.stack.match(/<anonymous>:(\d+):\d+/);
+            if (match) {
+              lineNumber = parseInt(match[1], 10);
+              lineNumber = Math.max(1, lineNumber - 2);
             }
           }
           
-          parentPort.postMessage({ 
-            success: false, 
-            error: \`\${error.message}\${lineNumber ? \` (Line \${lineNumber})\` : ''}\`,
+          resolve({
+            success: false,
+            error: `${error.message}${lineNumber ? ` (Line ${lineNumber})` : ''}`,
             logs,
             lineNumber
           });
-        }
+        });
+    } catch (error: any) {
+      resolve({
+        success: false,
+        error: error.message,
+        logs: [],
+        lineNumber: null
       });
-    `, { eval: true });
-
-    const timer = setTimeout(() => {
-      worker.terminate();
-      reject(new Error("Code execution timed out"));
-    }, timeout);
-
-    worker.on('message', (result: WorkerResponse) => {
-      clearTimeout(timer);
-      worker.terminate();
-      resolve(result);
-    });
-
-    worker.on('error', (error: Error) => {
-      clearTimeout(timer);
-      worker.terminate();
-      reject(error);
-    });
-
-    worker.postMessage({ code, context });
+    }
   });
 };
 
 export async function GET(request: NextRequest) {
-  return handleRequest(request, 'GET', null)
+  const preDefinedVariables = request.nextUrl.searchParams.get('preDefinedVariables')
+  return handleRequest(request, 'GET', null, preDefinedVariables)
 }
 
 export async function POST(request: NextRequest) {
   const data = await request.json()
-  return handleRequest(request, 'POST', data)
+  const preDefinedVariables = request.nextUrl.searchParams.get('preDefinedVariables')
+  return handleRequest(request, 'POST', data, preDefinedVariables)
 }
 
-async function handleRequest(request: NextRequest, method: string, data: any) {
+async function handleRequest(request: NextRequest, method: string, data: any, preDefinedVariables: string | null) {
   try {
     const pathname = request.nextUrl.pathname.split('/api/')[1]
     
     // Safely parse request data
-    console.log('Pathname:', pathname)
     
     const page = await getPageByEndpoint(pathname, method)
 
     if (!page) {
-      console.log('Endpoint not found')
       return NextResponse.json(
         { error: 'Endpoint not found' },
         { status: 404 }
       )
     }
-
-    console.log('Found page:', page.id)
 
     // Prepare the execution context
     const context = {
@@ -200,7 +168,7 @@ async function handleRequest(request: NextRequest, method: string, data: any) {
         query: Object.fromEntries(request.nextUrl.searchParams),
         body: method === 'POST' ? {
           code: data.code,
-          data: data.data // This is the parsed body data from the POST request
+          data: data.data
         } : null
       },
       response: {
@@ -210,26 +178,28 @@ async function handleRequest(request: NextRequest, method: string, data: any) {
       }
     }
 
-    // Wrap the code to handle async operations
-    const wrappedCode = `
-      (async function() {
-        try {
-          const result = await (async () => {
-            ${page.code}
-          })();
-          return result;
-        } catch(err) {
-          console.log('Error:', err.message);
-          response.body = { error: err.message };
-          response.status = 500;
-          return err.message;
-        }
-      })();
-    `
-
+    let extractedVars = null
+    if (preDefinedVariables) {
+      const preDefinedVariable = await getPreDefinedVariable(preDefinedVariables)
+      extractedVars = preDefinedVariable?.vars || null
+    } 
+    
     try {
-      const result = await executeCodeWithWorker(wrappedCode, context, 5000)
+      const result = await executeCodeInVM(page.code, context, 5000, extractedVars)
       
+      // Store logs asynchronously without waiting
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        output: result.success ? (result.result ? JSON.stringify(result.result) : '') : '',
+        console: result.logs.join('\n') || '',
+        returnValue: result.success ? (result.result ? JSON.stringify(result.result) : '') : '',
+      }
+      
+      // Fire and forget log storage
+      addLog(page.id, logEntry).catch(error => {
+        console.error('Failed to store logs:', error)
+      })
+
       if (!result.success) {
         return NextResponse.json({ 
           success: false,
@@ -252,6 +222,19 @@ async function handleRequest(request: NextRequest, method: string, data: any) {
       )
 
     } catch (error: any) {
+      // Store error logs asynchronously without waiting
+      const errorLogEntry = {
+        timestamp: new Date().toISOString(),
+        output: `Execution Error: ${error.message}`,
+        console: '',
+        returnValue: '',
+      }
+      
+      // Fire and forget error log storage
+      addLog(page.id, errorLogEntry).catch(error => {
+        console.error('Failed to store error logs:', error)
+      })
+
       return NextResponse.json({ 
         success: false,
         output: null,

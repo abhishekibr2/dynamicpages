@@ -72,3 +72,71 @@ export const deletePage = async (pageId: string) => {
     }
     return data;
 };
+
+export const addLog = async (pageId: string, log: {
+    timestamp: string;
+    output: string;
+    console: string;
+    returnValue: string;
+}) => {
+    const supabase = createClient();
+    
+    // First get existing logs
+    const { data: existingData, error: fetchError } = await supabase
+        .from('pages')
+        .select('logs')
+        .eq('id', pageId)
+        .single();
+    
+    if (fetchError) {
+        throw new Error('Failed to fetch existing logs');
+    }
+
+    // Combine existing logs with new log
+    const updatedLogs = [...(existingData?.logs || []), log];
+
+    // Update the page with new logs
+    const { data, error } = await supabase
+        .from('pages')
+        .update({ logs: updatedLogs })
+        .eq('id', pageId)
+        .select();
+
+    if (error) {
+        throw new Error('Failed to add log to page');
+    }
+    return data;
+};
+
+export const getLogs = async (pageId: string) => {
+    const supabase = createClient();
+    const { data, error } = await supabase
+        .from('pages')
+        .select('logs')
+        .eq('id', pageId)
+        .single();
+        
+    if (error) {
+        throw new Error('Failed to fetch logs');
+    }
+    return data.logs as {
+        timestamp: string;
+        output: string;
+        console: string;
+        returnValue: string;
+    }[];
+};
+
+export const clearLogs = async (pageId: string) => {
+    const supabase = createClient();
+    const { data, error } = await supabase
+        .from('pages')
+        .update({ logs: [] })
+        .eq('id', pageId)
+        .select();
+        
+    if (error) {
+        throw new Error('Failed to clear logs');
+    }
+    return data;
+};
