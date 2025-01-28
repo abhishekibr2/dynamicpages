@@ -84,7 +84,7 @@ const executeCodeInVM = (code: string, context: any, timeout = 5000, extractedVa
       let requestDataString;
       try {
         requestDataString = requestData;
-        const data = requestDataString ? JSON.stringify(requestDataString) : 'null'
+        const data = requestDataString ? JSON.stringify(requestDataString.data) : 'null'
         const wrappedCode = `
           (async function() {
             try {
