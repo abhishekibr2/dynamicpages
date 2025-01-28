@@ -12,5 +12,7 @@ export type Page = {
         output: string;
         console: string;
         returnValue: string;
+        request: string;
+        success: boolean;
     }[];
 };

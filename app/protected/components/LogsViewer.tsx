@@ -1,6 +1,6 @@
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
-import { Trash2, RefreshCcw } from "lucide-react"
+import { Trash2, RefreshCcw, ChevronRight } from "lucide-react"
 import { clearLogs } from "@/utils/supabase/actions/page"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -11,12 +11,21 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { useState } from "react"
 
 interface Log {
     timestamp: string;
     output: string;
     console: string;
     returnValue: string;
+    request: string;
+    success: boolean;
 }
 
 interface LogsViewerProps {
@@ -27,6 +36,7 @@ interface LogsViewerProps {
 
 export function LogsViewer({ logs, pageId, onLogsCleared }: LogsViewerProps) {
     const { toast } = useToast()
+    const [selectedLog, setSelectedLog] = useState<Log | null>(null)
 
     const handleClearLogs = async () => {
         try {
@@ -80,16 +90,15 @@ export function LogsViewer({ logs, pageId, onLogsCleared }: LogsViewerProps) {
                     <TableHeader>
                         <TableRow className="hover:bg-transparent">
                             <TableHead className="w-[180px] font-semibold">Timestamp</TableHead>
-                            <TableHead className="font-semibold">Output</TableHead>
-                            <TableHead className="font-semibold">Console</TableHead>
-                            <TableHead className="font-semibold">Return Value</TableHead>
+                            <TableHead className="font-semibold">Status</TableHead>
+                            <TableHead className="w-[100px] font-semibold text-right">Action</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {logs.length === 0 ? (
                             <TableRow>
-                                <TableCell 
-                                    colSpan={4} 
+                                <TableCell
+                                    colSpan={3}
                                     className="h-[200px] text-center text-muted-foreground"
                                 >
                                     <div className="flex flex-col items-center justify-center gap-2">
@@ -102,24 +111,33 @@ export function LogsViewer({ logs, pageId, onLogsCleared }: LogsViewerProps) {
                             </TableRow>
                         ) : (
                             logs.slice().reverse().map((log, index) => (
-                                <TableRow key={index} className="hover:bg-muted/50">
-                                    <TableCell className="font-mono text-sm text-muted-foreground">
+                                <TableRow
+                                    key={index}
+                                    className="hover:bg-muted/50 cursor-pointer"
+                                    onClick={() => setSelectedLog(log)}
+                                >
+                                    <TableCell className="font-mono text-sm">
                                         {formatDate(log.timestamp)}
                                     </TableCell>
                                     <TableCell>
-                                        <div className="max-h-[150px] overflow-auto rounded-md bg-muted/50 p-2">
-                                            <pre className="text-sm whitespace-pre-wrap font-mono">{log.output}</pre>
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full ${log.success ? 'bg-green-500' : 'bg-destructive'}`} />
+                                            <span className="text-sm">
+                                                {log.success ? 'Success' : 'Failed'}
+                                            </span>
                                         </div>
                                     </TableCell>
-                                    <TableCell>
-                                        <div className="max-h-[150px] overflow-auto rounded-md bg-muted/50 p-2">
-                                            <pre className="text-sm whitespace-pre-wrap font-mono">{log.console}</pre>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="max-h-[150px] overflow-auto rounded-md bg-muted/50 p-2">
-                                            <pre className="text-sm whitespace-pre-wrap font-mono">{log.returnValue}</pre>
-                                        </div>
+                                    <TableCell className="text-right">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setSelectedLog(log)
+                                            }}
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
                                     </TableCell>
                                 </TableRow>
                             ))
@@ -127,6 +145,42 @@ export function LogsViewer({ logs, pageId, onLogsCleared }: LogsViewerProps) {
                     </TableBody>
                 </Table>
             </ScrollArea>
+
+            <Dialog open={selectedLog !== null} onOpenChange={(open) => !open && setSelectedLog(null)}>
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Log Details - {selectedLog && formatDate(selectedLog.timestamp)}</DialogTitle>
+                    </DialogHeader>
+                    {selectedLog && (
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-sm font-medium mb-2">Request</h3>
+                                <div className="rounded-md bg-muted/50 p-4">
+                                    <pre className="text-sm whitespace-pre-wrap font-mono">{selectedLog.request}</pre>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-medium mb-2">Output</h3>
+                                <div className="rounded-md bg-muted/50 p-4">
+                                    <pre className="text-sm whitespace-pre-wrap font-mono">{selectedLog.output}</pre>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-medium mb-2">Console Output</h3>
+                                <div className="rounded-md bg-muted/50 p-4">
+                                    <pre className="text-sm whitespace-pre-wrap font-mono">{selectedLog.console}</pre>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-medium mb-2">Return Value</h3>
+                                <div className="rounded-md bg-muted/50 p-4">
+                                    <pre className="text-sm whitespace-pre-wrap font-mono">{selectedLog.returnValue}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     )
 } 
