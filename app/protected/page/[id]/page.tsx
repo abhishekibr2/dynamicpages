@@ -43,7 +43,11 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog"
+import { Toolbox } from "@/types/Toolbox"
+import { getToolbox, updateToolbox } from "@/utils/supabase/actions/toolTip"
+import { debounce } from "lodash"
 
 interface PageEditorProps {
     params: Promise<{
@@ -85,6 +89,7 @@ export default function PageEditor({ params }: PageEditorProps) {
     const [consoleOutput, setConsoleOutput] = useState<string>('')
     const [returnValue, setReturnValue] = useState<string>('')
     const [isRunning, setIsRunning] = useState(false)
+    const [activeTab, setActiveTab] = useState('return')
     const [postBody, setPostBody] = useState<string>('{\n  \n}')
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
     const [showUnsavedAlert, setShowUnsavedAlert] = useState(false)
@@ -97,6 +102,7 @@ export default function PageEditor({ params }: PageEditorProps) {
     const [showPreDefinedVarDialog, setShowPreDefinedVarDialog] = useState(false)
     const [selectedPreDefinedVar, setSelectedPreDefinedVar] = useState<PreDefinedVariable | undefined>(undefined)
     const [selectedVarCode, setSelectedVarCode] = useState<string>('')
+    const [toolbox, setToolbox] = useState<Toolbox>({ description: '' })
     const { theme } = useTheme()
     const {
         register,
@@ -461,13 +467,14 @@ export default function PageEditor({ params }: PageEditorProps) {
     }
 
     const handleRunCode = async () => {
-        const codeToRun = getFullCodeForRunning() // Use combined code for running
+        const codeToRun = getFullCodeForRunning()
         if (!codeToRun) return
 
         setIsRunning(true)
         setOutput('Running...')
         setConsoleOutput('Running...')
         setReturnValue('Running...')
+        setActiveTab('return') // Switch to output tab
 
         const currentFormData = {
             title: watch('title'),
@@ -503,9 +510,7 @@ export default function PageEditor({ params }: PageEditorProps) {
             if (method === 'POST') {
                 try {
                     const parsedBody = JSON.parse(postBody)
-                    requestConfig.body = JSON.stringify({
-                        data: parsedBody
-                    })
+                    requestConfig.body = JSON.stringify(parsedBody)
                 } catch (e) {
                     const errorOutput = 'Error: Invalid JSON in request body'
                     setOutput(errorOutput)
@@ -516,7 +521,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 }
             }
 
-            const response = await fetch(`/api${watch('endpoint')}?preDefinedVariables=${watch('preDefinedVariables')}`, requestConfig)
+            const response = await fetch(`/api${watch('endpoint')}?preDefinedVariables=${watch('preDefinedVariables')}&logs=true`, requestConfig)
             const data = await response.json()
 
             let outputText = ''
@@ -579,6 +584,41 @@ export default function PageEditor({ params }: PageEditorProps) {
         const baseUrl = `${window.location.origin}/api${watch('endpoint')}`
         return `${baseUrl}`
     }
+
+    useEffect(() => {
+        const fetchToolbox = async () => {
+            try {
+                const toolboxData = await getToolbox();
+                setToolbox(toolboxData);
+            } catch (error) {
+                console.error('Error fetching toolbox:', error);
+                toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: "Failed to fetch toolbox description",
+                });
+            }
+        };
+        fetchToolbox();
+    }, []);
+
+    const handleToolboxUpdate = async (description: string) => {
+        try {
+            const updatedToolbox = await updateToolbox({ description });
+            setToolbox(updatedToolbox);
+            toast({
+                title: "Success",
+                description: "Toolbox description updated successfully",
+            });
+        } catch (error) {
+            console.error('Error updating toolbox:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update toolbox description",
+            });
+        }
+    };
 
     if (isLoading) {
         return <SkeletonPage />
@@ -769,7 +809,85 @@ export default function PageEditor({ params }: PageEditorProps) {
                 <div className="w-1/2 p-6">
                     <div className="rounded-lg border bg-card h-full flex flex-col">
                         <div className="flex-none flex items-center justify-between border-b px-3 py-2">
-                            <h3 className="font-semibold">Code Editor</h3>
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-semibold">Code Editor</h3>
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" size="sm">
+                                            <Settings2 className="h-4 w-4 mr-2" />
+                                            Toolbox
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="max-w-3xl">
+                                        <DialogHeader>
+                                            <DialogTitle>Toolbox</DialogTitle>
+                                            <DialogDescription>
+                                                Edit the toolbox description below. Changes will be saved when you click Update.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="space-y-4">
+                                            <div className="h-[400px] border rounded-md overflow-hidden">
+                                                <Editor
+                                                    height="100%"
+                                                    defaultLanguage="javascript"
+                                                    theme={`vs-${theme}`}
+                                                    value={toolbox.description}
+                                                    onChange={(value) => {
+                                                        setToolbox(prev => ({ ...prev, description: value || '' }));
+                                                    }}
+                                                    options={{
+                                                        minimap: { enabled: false },
+                                                        fontSize: 14,
+                                                        lineNumbers: 'on',
+                                                        scrollBeyondLastLine: false,
+                                                        automaticLayout: true,
+                                                        padding: { top: 16, bottom: 16 },
+                                                        wordWrap: 'on',
+                                                        scrollbar: {
+                                                            alwaysConsumeMouseWheel: false,
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button 
+                                                            variant="destructive"
+                                                            size="sm"
+                                                        >
+                                                            Reset Description
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Reset Toolbox Description?</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                This will clear the current description. This action cannot be undone.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <AlertDialogAction
+                                                                onClick={() => handleToolboxUpdate('')}
+                                                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                            >
+                                                                Reset
+                                                            </AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                                <Button 
+                                                    onClick={() => handleToolboxUpdate(toolbox.description)}
+                                                    size="sm"
+                                                >
+                                                    Update Description
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                             <div className="flex items-center gap-2">
                                 {watch('method') === 'GET' ? (
                                     <Button
@@ -870,7 +988,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 {/* Right Column - Tabs */}
                 <div className="w-1/2 p-6">
                     <div className="rounded-lg border bg-card h-full flex flex-col">
-                        <Tabs defaultValue="return" className="flex-1 flex flex-col">
+                        <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="return" className="flex-1 flex flex-col min-h-0">
                             <div className="flex-none flex items-center justify-between border-b px-3 py-2">
                                 <TabsList className="h-12 bg-transparent">
                                     <TabsTrigger value="return">
@@ -890,21 +1008,27 @@ export default function PageEditor({ params }: PageEditorProps) {
                                 </TabsList>
                             </div>
 
-                            <div className="flex-1 overflow-hidden">
-                                <TabsContent value="return" className="m-0 h-full">
-                                    <div className="h-full overflow-auto">
-                                        <div className="font-mono text-sm">
-                                            <div className="p-4 border-b">
-                                                <h3 className="font-semibold mb-2">Return Value</h3>
-                                                <pre className="whitespace-pre-wrap">
-                                                    {returnValue}
-                                                </pre>
+                            <div className="flex-1 overflow-hidden min-h-0">
+                                <TabsContent value="return" className="h-full m-0">
+                                    <div className="h-full flex flex-col min-h-0">
+                                        <div className="h-[75%] min-h-0 border-b flex flex-col">
+                                            <div className="p-4 flex-1 flex flex-col min-h-0">
+                                                <h3 className="flex-none font-semibold mb-2">Return Value</h3>
+                                                <div className="flex-1 overflow-y-auto min-h-0 rounded bg-background">
+                                                    <pre className="whitespace-pre-wrap p-2">
+                                                        {returnValue}
+                                                    </pre>
+                                                </div>
                                             </div>
-                                            <div className="p-4 bg-muted/50">
-                                                <h3 className="font-semibold mb-2">Console Output</h3>
-                                                <pre className="whitespace-pre-wrap">
-                                                    {consoleOutput}
-                                                </pre>
+                                        </div>
+                                        <div className="h-[25%] min-h-0 flex flex-col">
+                                            <div className="p-4 flex-1 flex flex-col min-h-0 bg-muted/50">
+                                                <h3 className="flex-none font-semibold mb-2">Console Output</h3>
+                                                <div className="flex-1 overflow-y-auto min-h-0 rounded bg-background/50">
+                                                    <pre className="whitespace-pre-wrap p-2">
+                                                        {consoleOutput}
+                                                    </pre>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
