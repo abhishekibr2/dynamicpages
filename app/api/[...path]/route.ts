@@ -254,6 +254,7 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
         success: false,
         output: result.logs.join('\n'),
         error: result.error,
+        logs: result.logs
       }, { status: 400 })
     }
 
@@ -261,7 +262,8 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
       (result.response?.body) || {
         success: true,
         output: result.result,
-        error: null
+        error: null,
+        logs: result.logs.join('\n') || 'No console output',
       },
       {
         status: result.response?.status || 200,
@@ -291,6 +293,7 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
         output: null,
         error: `Server Error: ${error.message}`,
         details: error.stack,
+        logs: [error.message, error.stack].filter(Boolean)
       },
       { status: 500 }
     )
