@@ -808,7 +808,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                             {selectedVarCode && (
                                 <div className="flex-none p-2 bg-muted/50 border-b">
                                     <pre className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                        {"//to change the predefined variables, click on setting and then on the variable you want to change\n\n" + selectedVarCode}
+                                        {"//To change the predefined variables, click on predefined tab and then set the variables. \n\n" + selectedVarCode}
                                     </pre>
                                 </div>
                             )}
@@ -874,10 +874,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                             <div className="flex-none flex items-center justify-between border-b px-3 py-2">
                                 <TabsList className="h-12 bg-transparent">
                                     <TabsTrigger value="return">
-                                        Return Value
-                                    </TabsTrigger>
-                                    <TabsTrigger value="console">
-                                        Console Output
+                                        Output
                                     </TabsTrigger>
                                     <TabsTrigger value="logs">
                                         Logs
@@ -893,108 +890,115 @@ export default function PageEditor({ params }: PageEditorProps) {
                                 </TabsList>
                             </div>
 
-                            <div className="flex-1 overflow-auto">
+                            <div className="flex-1 overflow-hidden">
                                 <TabsContent value="return" className="m-0 h-full">
-                                    <div className="font-mono text-sm h-full overflow-auto">
-                                        <pre className="whitespace-pre-wrap">
-                                            {returnValue}
-                                        </pre>
-                                    </div>
-                                </TabsContent>
-
-                                <TabsContent value="console" className="h-full">
-                                    <div className="bg-muted/50 font-mono text-sm h-full overflow-auto">
-                                        <pre className="whitespace-pre-wrap m-2">
-                                            {consoleOutput}
-                                        </pre>
-                                    </div>
-                                </TabsContent>
-
-                                <TabsContent value="logs" className="p-4 m-0 h-full">
-                                    <LogsViewer
-                                        logs={watch('logs') || []}
-                                        pageId={resolvedParams.id}
-                                        onLogsCleared={() => {
-                                            setValue('logs', [], { shouldDirty: true })
-                                            fetchPage()
-                                        }}
-                                    />
-                                </TabsContent>
-
-                                <TabsContent value="variables" className="p-4 m-0 h-full">
-                                    <div className="space-y-4 h-full flex flex-col">
-                                        <div className="flex-none flex items-center justify-between">
-                                            <div className="flex items-center space-x-2">
-                                                <Checkbox
-                                                    id="usePreDefinedVars"
-                                                    checked={watch('preDefinedVariables') !== null}
-                                                    onCheckedChange={(checked) => {
-                                                        if (!checked) {
-                                                            setValue('preDefinedVariables', null, { shouldDirty: true });
-                                                        } else if (preDefinedVariables.length > 0) {
-                                                            setValue('preDefinedVariables', Number(preDefinedVariables[0].id), { shouldDirty: true });
-                                                        }
-                                                    }}
-                                                />
-                                                <Label htmlFor="usePreDefinedVars">Use Pre-defined Variables</Label>
+                                    <div className="h-full overflow-auto">
+                                        <div className="font-mono text-sm">
+                                            <div className="p-4 border-b">
+                                                <h3 className="font-semibold mb-2">Return Value</h3>
+                                                <pre className="whitespace-pre-wrap">
+                                                    {returnValue}
+                                                </pre>
                                             </div>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                    setSelectedPreDefinedVar(undefined)
-                                                    setShowPreDefinedVarDialog(true)
-                                                }}
-                                            >
-                                                Add New Variable
-                                            </Button>
+                                            <div className="p-4 bg-muted/50">
+                                                <h3 className="font-semibold mb-2">Console Output</h3>
+                                                <pre className="whitespace-pre-wrap">
+                                                    {consoleOutput}
+                                                </pre>
+                                            </div>
                                         </div>
-                                        {watch('preDefinedVariables') !== null && (
-                                            <Command className="border rounded-md flex-1 overflow-auto">
-                                                <CommandInput placeholder="Search pre-defined variables..." />
-                                                <CommandList>
-                                                    <CommandEmpty>No results found.</CommandEmpty>
-                                                    <CommandGroup>
-                                                        {preDefinedVariables.map((variable) => (
-                                                            <CommandItem
-                                                                key={variable.id}
-                                                                onSelect={() => {
-                                                                    setValue('preDefinedVariables', Number(variable.id), { shouldDirty: true });
-                                                                }}
-                                                                className="flex items-center gap-2 cursor-pointer"
-                                                            >
-                                                                <div
-                                                                    className="w-3 h-3 rounded-full"
-                                                                    style={{ backgroundColor: variable.color }}
-                                                                />
-                                                                <span>{variable.title}</span>
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="ml-2"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setSelectedPreDefinedVar({
-                                                                            ...variable,
-                                                                            vars: variable.vars || '',
-                                                                            created_at: variable.created_at || new Date().toISOString()
-                                                                        });
-                                                                        setShowPreDefinedVarDialog(true);
+                                    </div>
+                                </TabsContent>
+
+                                <TabsContent value="logs" className="h-full m-0">
+                                    <div className="h-full p-4">
+                                        <LogsViewer
+                                            logs={watch('logs') || []}
+                                            pageId={resolvedParams.id}
+                                            onLogsCleared={() => {
+                                                setValue('logs', [], { shouldDirty: true })
+                                                fetchPage()
+                                            }}
+                                        />
+                                    </div>
+                                </TabsContent>
+
+                                <TabsContent value="variables" className="h-full m-0">
+                                    <div className="h-full p-4">
+                                        <div className="space-y-4 h-full flex flex-col">
+                                            <div className="flex-none flex items-center justify-between">
+                                                <div className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id="usePreDefinedVars"
+                                                        checked={watch('preDefinedVariables') !== null}
+                                                        onCheckedChange={(checked) => {
+                                                            if (!checked) {
+                                                                setValue('preDefinedVariables', null, { shouldDirty: true });
+                                                            } else if (preDefinedVariables.length > 0) {
+                                                                setValue('preDefinedVariables', Number(preDefinedVariables[0].id), { shouldDirty: true });
+                                                            }
+                                                        }}
+                                                    />
+                                                    <Label htmlFor="usePreDefinedVars">Use Pre-defined Variables</Label>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setSelectedPreDefinedVar(undefined)
+                                                        setShowPreDefinedVarDialog(true)
+                                                    }}
+                                                >
+                                                    Add New Variable
+                                                </Button>
+                                            </div>
+                                            {watch('preDefinedVariables') !== null && (
+                                                <Command className="border rounded-md flex-1 overflow-auto">
+                                                    <CommandInput placeholder="Search pre-defined variables..." />
+                                                    <CommandList>
+                                                        <CommandEmpty>No results found.</CommandEmpty>
+                                                        <CommandGroup>
+                                                            {preDefinedVariables.map((variable) => (
+                                                                <CommandItem
+                                                                    key={variable.id}
+                                                                    onSelect={() => {
+                                                                        setValue('preDefinedVariables', Number(variable.id), { shouldDirty: true });
                                                                     }}
+                                                                    className="flex items-center gap-2 cursor-pointer"
                                                                 >
-                                                                    Edit
-                                                                </Button>
-                                                                {watch('preDefinedVariables') === Number(variable.id) && (
-                                                                    <Check className="ml-auto h-4 w-4" />
-                                                                )}
-                                                            </CommandItem>
-                                                        ))}
-                                                    </CommandGroup>
-                                                </CommandList>
-                                            </Command>
-                                        )}
+                                                                    <div
+                                                                        className="w-3 h-3 rounded-full"
+                                                                        style={{ backgroundColor: variable.color }}
+                                                                    />
+                                                                    <span>{variable.title}</span>
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="ml-2"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedPreDefinedVar({
+                                                                                ...variable,
+                                                                                vars: variable.vars || '',
+                                                                                created_at: variable.created_at || new Date().toISOString()
+                                                                            });
+                                                                            setShowPreDefinedVarDialog(true);
+                                                                        }}
+                                                                    >
+                                                                        Edit
+                                                                    </Button>
+                                                                    {watch('preDefinedVariables') === Number(variable.id) && (
+                                                                        <Check className="ml-auto h-4 w-4" />
+                                                                    )}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            )}
+                                        </div>
                                     </div>
                                 </TabsContent>
 
