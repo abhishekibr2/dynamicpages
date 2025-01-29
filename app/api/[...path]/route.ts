@@ -84,12 +84,12 @@ const executeCodeInVM = (code: string, context: any, timeout = 5000, extractedVa
       let requestDataString;
       try {
         requestDataString = requestData;
-        const data = requestDataString ? JSON.stringify(requestDataString.data) : 'null'
+        const data = requestDataString ? JSON.stringify(requestDataString) : 'null'
         const wrappedCode = `
           (async function() {
             try {
               const result = await (async () => {
-                const data = ${data}
+                const reqQuery = ${data}
                 ${preDefinedVars}
                 ${code}
               })();
@@ -165,19 +165,20 @@ const executeCodeInVM = (code: string, context: any, timeout = 5000, extractedVa
 
 export async function GET(request: NextRequest) {
   const preDefinedVariables = request.nextUrl.searchParams.get('preDefinedVariables')
-  return handleRequest(request, 'GET', null, preDefinedVariables)
+  const logs = request.nextUrl.searchParams.get('logs')
+  return handleRequest(request, 'GET', null, preDefinedVariables, logs === 'true')
 }
 
 export async function POST(request: NextRequest) {
   const data = await request.json()
   const preDefinedVariables = request.nextUrl.searchParams.get('preDefinedVariables')
-  return handleRequest(request, 'POST', data, preDefinedVariables)
+  const logs = request.nextUrl.searchParams.get('logs')
+  return handleRequest(request, 'POST', data, preDefinedVariables, logs === 'true')
 }
 
-async function handleRequest(request: NextRequest, method: string, data: any | null, preDefinedVariables: string | null) {
+async function handleRequest(request: NextRequest, method: string, data: any | null, preDefinedVariables: string | null, logs: boolean | false) {
   let page;
   let logEntry = null;
-  
   try {
     const pathname = request.nextUrl.pathname.split('/api/')[1]
     page = await getPageByEndpoint(pathname, method)
@@ -254,16 +255,16 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
         success: false,
         output: result.logs.join('\n'),
         error: result.error,
-        logs: result.logs
+        ...(logs ? { logs: result.logs } : {})
       }, { status: 400 })
     }
 
     return NextResponse.json(
-      (result.response?.body) || {
+      {
         success: true,
         output: result.result,
         error: null,
-        logs: result.logs.join('\n') || 'No console output',
+        ...(logs ? { logs: result.logs.join('\n') || 'No console output' } : {})
       },
       {
         status: result.response?.status || 200,
@@ -293,7 +294,8 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
         output: null,
         error: `Server Error: ${error.message}`,
         details: error.stack,
-        logs: [error.message, error.stack].filter(Boolean)
+        lineNumber: null,
+        ...(logs ? { logs: [error.message, error.stack].filter(Boolean) } : {})
       },
       { status: 500 }
     )
