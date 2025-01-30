@@ -82,11 +82,7 @@ export function OutputSection({
                                         <h3 className="flex-none font-semibold mb-2">Return Value</h3>
                                         <div className="flex-1 overflow-y-auto min-h-0 rounded bg-background">
                                             <pre className="whitespace-pre-wrap p-2">
-                                                {
-                                                    returnValue && returnValue !== "Running..." ?
-                                                        JSON.stringify(JSON.parse(returnValue), null, 2) :
-                                                        returnValue
-                                                }
+                                                {returnValue}
                                             </pre>
                                         </div>
                                     </div>
@@ -96,9 +92,7 @@ export function OutputSection({
                                         <h3 className="flex-none font-semibold mb-2">Console Output</h3>
                                         <div className="flex-1 overflow-y-auto min-h-0 rounded bg-background/50">
                                             <pre className="whitespace-pre-wrap p-2">
-                                                {consoleOutput && consoleOutput !== "Running..." ?
-                                                    JSON.stringify(JSON.parse(consoleOutput), null, 2) :
-                                                    consoleOutput}
+                                                {consoleOutput}
                                             </pre>
                                         </div>
                                     </div>

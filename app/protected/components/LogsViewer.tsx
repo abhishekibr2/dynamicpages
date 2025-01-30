@@ -158,16 +158,7 @@ export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewe
                                 <h3 className="text-sm font-medium mb-2">Request</h3>
                                 <div className="rounded-md bg-muted/50 p-4">
                                     <pre className="text-sm whitespace-pre-wrap font-mono">
-                                        {(() => {
-                                            if (selectedLog.request) {
-                                                try {
-                                                    return JSON.stringify(JSON.parse(selectedLog.request), null, 2);
-                                                } catch {
-                                                    return selectedLog.request;
-                                                }
-                                            }
-                                            return selectedLog.request;
-                                        })()}
+                                        {selectedLog.request}
                                     </pre>
                                 </div>
                             </div>
@@ -175,16 +166,7 @@ export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewe
                                 <h3 className="text-sm font-medium mb-2">Output</h3>
                                 <div className="rounded-md bg-muted/50 p-4">
                                     <pre className="text-sm whitespace-pre-wrap font-mono">
-                                        {(() => {
-                                            if (selectedLog.output) {
-                                                try {
-                                                    return JSON.stringify(JSON.parse(selectedLog.output), null, 2);
-                                                } catch {
-                                                    return selectedLog.output;
-                                                }
-                                            }
-                                            return selectedLog.output;
-                                        })()}
+                                        {selectedLog.output}
                                     </pre>
                                 </div>
                             </div>
@@ -192,16 +174,7 @@ export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewe
                                 <h3 className="text-sm font-medium mb-2">Console Output</h3>
                                 <div className="rounded-md bg-muted/50 p-4">
                                     <pre className="text-sm whitespace-pre-wrap font-mono">
-                                        {(() => {
-                                            if (selectedLog.console) {
-                                                try {
-                                                    return JSON.stringify(JSON.parse(selectedLog.console), null, 2);
-                                                } catch {
-                                                    return selectedLog.console;
-                                                }
-                                            }
-                                            return selectedLog.console;
-                                        })()}
+                                        {selectedLog.console}
                                     </pre>
                                 </div>
                             </div>
@@ -209,16 +182,7 @@ export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewe
                                 <h3 className="text-sm font-medium mb-2">Return Value</h3>
                                 <div className="rounded-md bg-muted/50 p-4">
                                     <pre className="text-sm whitespace-pre-wrap font-mono">
-                                        {(() => {
-                                            if (selectedLog.returnValue) {
-                                                try {
-                                                    return JSON.stringify(JSON.parse(selectedLog.returnValue), null, 2);
-                                                } catch {
-                                                    return selectedLog.returnValue;
-                                                }
-                                            }
-                                            return selectedLog.returnValue;
-                                        })()}
+                                        {selectedLog.returnValue}
                                     </pre>
                                 </div>
                             </div>
