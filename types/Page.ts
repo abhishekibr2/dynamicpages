@@ -6,6 +6,7 @@ export type Page = {
     endpoint: string;
     created_at: string;
     method: string;
+    test_post_body: string | null;
     preDefinedVariables: number | null;
     logs: {
         timestamp: string;

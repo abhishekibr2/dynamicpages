@@ -1,83 +1,31 @@
 'use client'
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { getPage, updatePage, deletePage, createPage } from "@/utils/supabase/actions/page"
-import Editor from "@monaco-editor/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { use } from "react"
-import { ArrowLeft, Play, Settings2, ExternalLink, Copy } from "lucide-react"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Select, SelectTrigger, SelectValue, SelectItem, SelectContent } from "@/components/ui/select"
-import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { cn } from "@/lib/utils"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command"
-import { Check } from "lucide-react"
 import { getPreDefinedVariables } from "@/utils/supabase/actions/preDefinedVars"
 import { PreDefinedVariableDialog } from "../../components/PreDefinedVariablesDialog"
 import { PreDefinedVariable } from "@/types/PreDefinedVariable"
-import { useTheme } from "next-themes"
-import SkeletonPage from "@/components/skeleton-page"
-import { LogsViewer } from "../../components/LogsViewer"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
-import { Toolbox } from "@/types/Toolbox"
 import { getToolbox, updateToolbox } from "@/utils/supabase/actions/toolTip"
-import { debounce } from "lodash"
+import { Toolbox } from "@/types/Toolbox"
+import SkeletonPage from "@/components/skeleton-page"
+import { pageSchema, PageFormData } from "../types"
+import { PageHeader } from "../components/PageHeader"
+import { PageInfoDialog } from "../components/PageInfoDialog"
+import { CodeEditorSection } from "../components/CodeEditorSection"
+import { OutputSection } from "../components/OutputSection"
+import { PostEndpointDialog } from "../components/PostEndpointDialog"
+import { GeneratedCodeDialog } from "../components/GeneratedCodeDialog"
 
 interface PageEditorProps {
     params: Promise<{
         id: string
     }>
 }
-
-const pageSchema = z.object({
-    title: z.string().min(1, "Title is required").max(100, "Title must be less than 100 characters"),
-    description: z.string().min(1, "Description is required").max(500, "Description must be less than 500 characters"),
-    code: z.string().min(1, "Code is required"),
-    endpoint: z.string().min(1, "Endpoint is required").startsWith("/", "Endpoint must start with /"),
-    method: z.enum(["GET", "POST"], {
-        required_error: "Method is required",
-        invalid_type_error: "Method must be either GET or POST"
-    }),
-    created_at: z.string(),
-    id: z.string().optional(),
-    preDefinedVariables: z.number().nullable(),
-    logs: z.array(z.object({
-        timestamp: z.string(),
-        output: z.string(),
-        console: z.string(),
-        returnValue: z.string(),
-        request: z.string(),
-        success: z.boolean()
-    })).default([])
-})
-
-type PageFormData = z.infer<typeof pageSchema>
 
 export default function PageEditor({ params }: PageEditorProps) {
     const resolvedParams = use(params)
@@ -95,19 +43,24 @@ export default function PageEditor({ params }: PageEditorProps) {
     const [showUnsavedAlert, setShowUnsavedAlert] = useState(false)
     const [pendingNavigation, setPendingNavigation] = useState<'back' | 'cancel' | null>(null)
     const [initialCode, setInitialCode] = useState<string>('')
-    const [lastKeyPress, setLastKeyPress] = useState<string>('')
-    const [lastKeyPressTime, setLastKeyPressTime] = useState<number>(0)
     const [editorErrors, setEditorErrors] = useState<string[]>([])
     const [preDefinedVariables, setPreDefinedVariables] = useState<PreDefinedVariable[]>([])
     const [showPreDefinedVarDialog, setShowPreDefinedVarDialog] = useState(false)
     const [selectedPreDefinedVar, setSelectedPreDefinedVar] = useState<PreDefinedVariable | undefined>(undefined)
     const [selectedVarCode, setSelectedVarCode] = useState<string>('')
     const [toolbox, setToolbox] = useState<Toolbox>({ description: '' })
-    const { theme } = useTheme()
+    const [showPageInfoDialog, setShowPageInfoDialog] = useState(false)
+    const [showPostEndpointDialog, setShowPostEndpointDialog] = useState(false)
+    const [showGeneratedCodeDialog, setShowGeneratedCodeDialog] = useState(false)
+    const [userCode, setUserCode] = useState<string>('')
+    const [actualCode, setActualCode] = useState<string>('')
+    const [initialFormState, setInitialFormState] = useState<PageFormData | null>(null)
+
+
     const {
         register,
         handleSubmit: handleFormSubmit,
-        formState: { errors, isDirty },
+        formState: { errors },
         setValue,
         watch,
         reset
@@ -121,14 +74,10 @@ export default function PageEditor({ params }: PageEditorProps) {
             method: 'GET',
             created_at: new Date().toISOString(),
             preDefinedVariables: null,
+            test_post_body: null,
             logs: []
         }
     })
-    const [userCode, setUserCode] = useState<string>('')
-    const [actualCode, setActualCode] = useState<string>('')
-    const [initialFormState, setInitialFormState] = useState<PageFormData | null>(null)
-    const [showPageInfoDialog, setShowPageInfoDialog] = useState(false)
-    const [showPostEndpointDialog, setShowPostEndpointDialog] = useState(false)
 
     // Track unsaved changes including code editor
     useEffect(() => {
@@ -141,10 +90,12 @@ export default function PageEditor({ params }: PageEditorProps) {
             method: watch('method'),
             code: actualCode,
             preDefinedVariables: watch('preDefinedVariables'),
+            test_post_body: watch('method') === 'POST' ? postBody : null,
             created_at: watch('created_at'),
             logs: (watch('logs') || []).map(log => ({
                 ...log,
-                request: log.request || JSON.stringify({})
+                request: log.request || JSON.stringify({}),
+                success: log.success || false
             }))
         } as const;
 
@@ -168,32 +119,6 @@ export default function PageEditor({ params }: PageEditorProps) {
 
         setHasUnsavedChanges(hasChanges);
     }, [watch('title'), watch('description'), watch('endpoint'), watch('method'), actualCode, watch('preDefinedVariables'), initialFormState]);
-
-    // Add keyboard shortcut handler
-    // useEffect(() => {
-    //     const handleKeyPress = (e: KeyboardEvent) => {
-    //         const currentTime = Date.now()
-    //         const newLastKey = e.key.toLowerCase()
-
-    //         if (newLastKey === 's') {
-    //             const timeDiff = currentTime - lastKeyPressTime
-    //             if (lastKeyPress === 's' && timeDiff <= 500) {
-    //                 handleNavigation('back')
-    //                 setLastKeyPress('')
-    //                 setLastKeyPressTime(0)
-    //             } else {
-    //                 setLastKeyPress('s')
-    //                 setLastKeyPressTime(currentTime)
-    //             }
-    //         } else {
-    //             setLastKeyPress('')
-    //             setLastKeyPressTime(0)
-    //         }
-    //     }
-
-    //     window.addEventListener('keypress', handleKeyPress)
-    //     return () => window.removeEventListener('keypress', handleKeyPress)
-    // }, [lastKeyPress, lastKeyPressTime])
 
     // Effect to fetch and update selected predefined variable's code
     useEffect(() => {
@@ -224,11 +149,6 @@ export default function PageEditor({ params }: PageEditorProps) {
     // Function to get the full code for running
     const getFullCodeForRunning = () => {
         return selectedVarCode ? `${selectedVarCode}\n\n${actualCode}` : actualCode
-    }
-
-    // Function to get the actual code for saving
-    const getActualCodeForSaving = () => {
-        return actualCode
     }
 
     const handleNavigation = (type: 'back' | 'cancel') => {
@@ -273,6 +193,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 method: 'GET',
                 created_at: new Date().toISOString(),
                 preDefinedVariables: null,
+                test_post_body: null,
                 logs: []
             });
         }
@@ -303,6 +224,11 @@ export default function PageEditor({ params }: PageEditorProps) {
             setUserCode(existingCode)
             setValue('code', existingCode)
 
+            // Set post body if it exists and method is POST
+            if (data.method === 'POST' && data.test_post_body) {
+                setPostBody(data.test_post_body)
+            }
+
             // Set form values and track initial state
             const initialState = {
                 title: data.title || '',
@@ -312,6 +238,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 method: data.method || 'GET',
                 created_at: data.created_at || new Date().toISOString(),
                 preDefinedVariables: data.preDefinedVariables ? Number(data.preDefinedVariables) : null,
+                test_post_body: data.test_post_body,
                 logs: (data.logs || []).map((log: any) => ({
                     ...log,
                     request: log.request || JSON.stringify({}),
@@ -350,26 +277,10 @@ export default function PageEditor({ params }: PageEditorProps) {
         }
     }
 
-    // Add an effect to handle initial loading of predefined variables
-    useEffect(() => {
-        if (preDefinedVariables.length > 0 && !isNewPage) {
-            const selectedVarId = watch('preDefinedVariables')
-            if (selectedVarId !== null) {
-                const selectedVar = preDefinedVariables.find(v => Number(v.id) === selectedVarId)
-                if (selectedVar && selectedVar.vars) {
-                    const varsCode = selectedVar.vars.join('\n')
-                    setSelectedVarCode(varsCode)
-                }
-            } else {
-                setSelectedVarCode('')
-            }
-        }
-    }, [preDefinedVariables])
-
     const onSubmit = async (data: PageFormData) => {
         try {
             // Use actual code without predefined variables for saving
-            const codeToSave = getActualCodeForSaving()
+            const codeToSave = actualCode
 
             if (isNewPage) {
                 const { id, ...newPageData } = data
@@ -377,11 +288,12 @@ export default function PageEditor({ params }: PageEditorProps) {
                     ...newPageData,
                     code: codeToSave,
                     preDefinedVariables: newPageData.preDefinedVariables ? Number(newPageData.preDefinedVariables) : null,
+                    test_post_body: watch('method') === 'POST' ? postBody : null,
                     logs: (newPageData.logs || []).map(log => ({
                         ...log,
                         request: log.request || JSON.stringify({}),
                         success: log.success || false
-                    }))
+                    })),
                 })
                 const newPageId = result[0].id
                 router.replace(`/protected/page/${newPageId}`)
@@ -391,6 +303,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                     ...newPageData,
                     code: codeToSave,
                     preDefinedVariables: newPageData.preDefinedVariables ? Number(newPageData.preDefinedVariables) : null,
+                    test_post_body: watch('method') === 'POST' ? postBody : null,
                     logs: (newPageData.logs || []).map(log => ({
                         ...log,
                         request: log.request || JSON.stringify({}),
@@ -411,6 +324,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                     ...updateData,
                     code: codeToSave,
                     preDefinedVariables: updateData.preDefinedVariables ? Number(updateData.preDefinedVariables) : null,
+                    test_post_body: watch('method') === 'POST' ? postBody : null,
                     logs: (watch('logs') || []).map(log => ({
                         ...log,
                         request: log.request || JSON.stringify({}),
@@ -424,6 +338,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                     code: codeToSave,
                     created_at: created_at,
                     preDefinedVariables: updateData.preDefinedVariables ? Number(updateData.preDefinedVariables) : null,
+                    test_post_body: watch('method') === 'POST' ? postBody : null,
                     logs: (watch('logs') || []).map(log => ({
                         ...log,
                         request: log.request || JSON.stringify({}),
@@ -479,7 +394,7 @@ export default function PageEditor({ params }: PageEditorProps) {
         const currentFormData = {
             title: watch('title'),
             description: watch('description'),
-            code: getActualCodeForSaving(), // Use actual code without predefined vars for saving
+            code: actualCode, // Use actual code without predefined vars for saving
             endpoint: watch('endpoint'),
             method: watch('method'),
             created_at: watch('created_at'),
@@ -528,16 +443,16 @@ export default function PageEditor({ params }: PageEditorProps) {
             let consoleText = ''
             let returnValueText = ''
 
-            if (data.error) {
-                const errorMessage = data.error
-                const lineNumber = data.lineNumber
+            if (data.status === "error") {
+                const errorMessage = data.message
+                const lineNumber = data.data?.lineNumber
                 outputText = lineNumber ? `Error at line ${lineNumber}: ${errorMessage}` : errorMessage
-                consoleText = errorMessage || ''
+                consoleText = data.data?.logs || ''
                 returnValueText = ''
             } else {
-                outputText = data.output !== undefined ? JSON.stringify(data.output, null, 2) : 'No return value'
-                consoleText = data.logs || ''
-                returnValueText = data.output !== undefined ? JSON.stringify(data.output, null, 2) : 'No return value'
+                outputText = data.data.output !== undefined ? JSON.stringify(data.data.output, null, 2) : 'No return value'
+                consoleText = data.data.logs || ''
+                returnValueText = data.data.output !== undefined ? JSON.stringify(data.data.output, null, 2) : 'No return value'
             }
 
             setOutput(outputText)
@@ -559,66 +474,80 @@ export default function PageEditor({ params }: PageEditorProps) {
         }
     }
 
-    const handleEditorValidation = (markers: any[]) => {
-        const errors = markers
-            .filter(marker => marker.severity === 8) // Error severity
-            .map(marker => `Line ${marker.startLineNumber}: ${marker.message}`);
-        setEditorErrors(errors);
-    };
-
-    const handlePreDefinedVarSuccess = async () => {
-        // Refresh the predefined variables list
+    const handleToolboxUpdate = async (description: string) => {
         try {
-            const vars = await getPreDefinedVariables()
-            setPreDefinedVariables(vars)
+            const updatedToolbox = await updateToolbox({ description })
+            setToolbox(updatedToolbox)
+            toast({
+                title: "Success",
+                description: "Toolbox description updated successfully",
+            })
         } catch (error) {
+            console.error('Error updating toolbox:', error)
             toast({
                 variant: "destructive",
                 title: "Error",
-                description: "Failed to refresh pre-defined variables",
+                description: "Failed to update toolbox description",
             })
         }
-    }
-
-    const getEndpointUrl = () => {
-        const baseUrl = `${window.location.origin}/api${watch('endpoint')}`
-        return `${baseUrl}`
     }
 
     useEffect(() => {
         const fetchToolbox = async () => {
             try {
-                const toolboxData = await getToolbox();
-                setToolbox(toolboxData);
+                const toolboxData = await getToolbox()
+                setToolbox(toolboxData)
             } catch (error) {
-                console.error('Error fetching toolbox:', error);
+                console.error('Error fetching toolbox:', error)
                 toast({
                     variant: "destructive",
                     title: "Error",
                     description: "Failed to fetch toolbox description",
-                });
+                })
             }
-        };
-        fetchToolbox();
-    }, []);
-
-    const handleToolboxUpdate = async (description: string) => {
-        try {
-            const updatedToolbox = await updateToolbox({ description });
-            setToolbox(updatedToolbox);
-            toast({
-                title: "Success",
-                description: "Toolbox description updated successfully",
-            });
-        } catch (error) {
-            console.error('Error updating toolbox:', error);
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to update toolbox description",
-            });
         }
-    };
+        fetchToolbox()
+    }, [])
+
+    const getGeneratedCode = () => {
+        const method = watch('method')
+        const endpoint = watch('endpoint')
+        const code = `const fetch = require('node-fetch');
+
+const query_data = $array_of_fields;  //return query_data;
+const jsonObject = JSON.parse(query_data); //return query_json;
+if (!Array.isArray(jsonObject.data)) {
+    jsonObject = convertToDataIndex(jsonObject); //return r; 
+}
+// New array to add
+const rankingFor = ["linkedin.com", "ibrinfotech.com", "vocal.com"];
+// Add the new array to the JSON object
+jsonObject["ranking_for"] = rankingFor;
+
+${method === 'POST' ? 'const raw = JSON.stringify(jsonObject);' : ''}
+const url = 'https://dynamicpages.vercel.app/api${endpoint}';
+const options = {
+    method: '${method}',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    ${method === 'POST' ? 'body: raw,' : ''}
+};
+try {
+    const response = await fetch(url, options);
+    const text = await response.text();
+    const json = JSON.parse(text);
+    return json.output; // Return only the "output" field
+} catch (error) {
+    console.error(error);
+    return '';
+}
+
+function convertToDataIndex(inputArray) {
+    return { data: inputArray };
+}`
+        return code
+    }
 
     if (isLoading) {
         return <SkeletonPage />
@@ -626,660 +555,105 @@ export default function PageEditor({ params }: PageEditorProps) {
 
     return (
         <div className="bg-background w-full">
-            {/* Unsaved Changes Alert Dialog */}
-            <AlertDialog open={showUnsavedAlert} onOpenChange={setShowUnsavedAlert}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            You have unsaved changes. Would you like to save before leaving?
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setShowUnsavedAlert(false)}>
-                            Continue Editing
-                        </AlertDialogCancel>
-                        <Button
-                            variant="outline"
-                            onClick={() => handleNavigationConfirm(false)}
-                        >
-                            Discard Changes
-                        </Button>
-                        <Button
-                            onClick={() => handleNavigationConfirm(true)}
-                        >
-                            Save & Leave
-                        </Button>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <PageHeader
+                title={watch('title')}
+                hasUnsavedChanges={hasUnsavedChanges}
+                isNewPage={isNewPage}
+                onNavigate={handleNavigation}
+                onShowPageInfo={() => setShowPageInfoDialog(true)}
+                onShowGeneratedCode={() => setShowGeneratedCodeDialog(true)}
+                onDelete={handleDelete}
+                onSave={handleFormSubmit(onSubmit)}
+                showUnsavedAlert={showUnsavedAlert}
+                setShowUnsavedAlert={setShowUnsavedAlert}
+                handleNavigationConfirm={handleNavigationConfirm}
+            />
 
-            {/* Page Info Dialog */}
-            <Dialog open={showPageInfoDialog} onOpenChange={setShowPageInfoDialog}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Page Information</DialogTitle>
-                        <DialogDescription>
-                            Edit the basic information for this page.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-6 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="title">Title</Label>
-                            <Input
-                                id="title"
-                                {...register('title')}
-                                className={cn(
-                                    errors.title && "border-destructive focus-visible:ring-destructive"
-                                )}
-                            />
-                            {errors.title && (
-                                <p className="text-sm text-destructive">{errors.title.message}</p>
-                            )}
-                        </div>
+            <PageInfoDialog
+                showDialog={showPageInfoDialog}
+                onOpenChange={setShowPageInfoDialog}
+                register={register}
+                errors={errors}
+                method={watch('method')}
+                onMethodChange={(value) => setValue('method', value as 'GET' | 'POST')}
+            />
 
-                        <div className="space-y-2">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea
-                                id="description"
-                                {...register('description')}
-                                className={cn(
-                                    "min-h-[120px] resize-none",
-                                    errors.description && "border-destructive focus-visible:ring-destructive"
-                                )}
-                            />
-                            {errors.description && (
-                                <p className="text-sm text-destructive">{errors.description.message}</p>
-                            )}
-                        </div>
+            <GeneratedCodeDialog
+                open={showGeneratedCodeDialog}
+                onOpenChange={setShowGeneratedCodeDialog}
+                code={getGeneratedCode()}
+            />
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="endpoint">Endpoint</Label>
-                                <Input
-                                    id="endpoint"
-                                    {...register('endpoint')}
-                                    className={cn(
-                                        errors.endpoint && "border-destructive focus-visible:ring-destructive"
-                                    )}
-                                />
-                                {errors.endpoint && (
-                                    <p className="text-sm text-destructive">{errors.endpoint.message}</p>
-                                )}
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="method">Method</Label>
-                                <Select
-                                    value={watch('method')}
-                                    onValueChange={(value) => setValue('method', value as 'GET' | 'POST')}
-                                >
-                                    <SelectTrigger className={cn(
-                                        errors.method && "border-destructive focus-visible:ring-destructive"
-                                    )}>
-                                        <SelectValue placeholder="Select method" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="GET">GET</SelectItem>
-                                        <SelectItem value="POST">POST</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                {errors.method && (
-                                    <p className="text-sm text-destructive">{errors.method.message}</p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            {/* Header */}
-            <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="w-full px-6 flex h-14 items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-2"
-                            onClick={() => handleNavigation('back')}
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                            Back
-                        </Button>
-                        <h1 className="text-xl font-semibold">
-                            {watch('title') || (isNewPage ? 'Create New Page' : 'Edit Page')}
-                            {hasUnsavedChanges && <span className="ml-2 text-sm text-muted-foreground">(Unsaved changes)</span>}
-                        </h1>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowPageInfoDialog(true)}
-                        >
-                            <Settings2 className="h-4 w-4 mr-2" />
-                            Page Settings
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleNavigation('cancel')}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            size="sm"
-                            onClick={handleFormSubmit(onSubmit)}
-                            variant="default"
-                        >
-                            {isNewPage ? 'Create' : 'Save Changes'}
-                        </Button>
-                        {!isNewPage && (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" size="sm">Delete</Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Delete Page?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            This action cannot be undone. This will permanently delete the
-                                            page and remove all its data from the server.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction
-                                            onClick={handleDelete}
-                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                        >
-                                            Delete
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* Main Content */}
             <div className="w-full h-[calc(100vh-3.5rem)] flex">
-                {/* Left Column - Code Editor */}
-                <div className="w-1/2 p-6">
-                    <div className="rounded-lg border bg-card h-full flex flex-col">
-                        <div className="flex-none flex items-center justify-between border-b px-3 py-2">
-                            <div className="flex items-center gap-2">
-                                <h3 className="font-semibold">Code Editor</h3>
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline" size="sm">
-                                            <Settings2 className="h-4 w-4 mr-2" />
-                                            Toolbox
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-w-3xl">
-                                        <DialogHeader>
-                                            <DialogTitle>Toolbox</DialogTitle>
-                                            <DialogDescription>
-                                                Edit the toolbox description below. Changes will be saved when you click Update.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <div className="space-y-4">
-                                            <div className="h-[400px] border rounded-md overflow-hidden">
-                                                <Editor
-                                                    height="100%"
-                                                    defaultLanguage="javascript"
-                                                    theme={`vs-${theme}`}
-                                                    value={toolbox.description}
-                                                    onChange={(value) => {
-                                                        setToolbox(prev => ({ ...prev, description: value || '' }));
-                                                    }}
-                                                    options={{
-                                                        minimap: { enabled: false },
-                                                        fontSize: 14,
-                                                        lineNumbers: 'on',
-                                                        scrollBeyondLastLine: false,
-                                                        automaticLayout: true,
-                                                        padding: { top: 16, bottom: 16 },
-                                                        wordWrap: 'on',
-                                                        scrollbar: {
-                                                            alwaysConsumeMouseWheel: false,
-                                                        }
-                                                    }}
-                                                />
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button 
-                                                            variant="destructive"
-                                                            size="sm"
-                                                        >
-                                                            Reset Description
-                                                        </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>Reset Toolbox Description?</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                This will clear the current description. This action cannot be undone.
-                                                            </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction
-                                                                onClick={() => handleToolboxUpdate('')}
-                                                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                                            >
-                                                                Reset
-                                                            </AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                                <Button 
-                                                    onClick={() => handleToolboxUpdate(toolbox.description)}
-                                                    size="sm"
-                                                >
-                                                    Update Description
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {watch('method') === 'GET' ? (
-                                    <Button
-                                        onClick={() => window.open(`/api${watch('endpoint')}`, '_blank')}
-                                        size="sm"
-                                        variant="outline"
-                                        className="gap-2"
-                                    >
-                                        <ExternalLink className="h-4 w-4" />
-                                        Open in Browser
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        onClick={() => setShowPostEndpointDialog(true)}
-                                        size="sm"
-                                        variant="outline"
-                                        className="gap-2"
-                                    >
-                                        <ExternalLink className="h-4 w-4" />
-                                        Endpoint Options
-                                    </Button>
-                                )}
-                                <Button
-                                    onClick={handleRunCode}
-                                    disabled={isRunning}
-                                    size="sm"
-                                    variant="default"
-                                    className="gap-2"
-                                >
-                                    <Play className="h-4 w-4" />
-                                    {isRunning ? 'Running...' : 'Run Code'}
-                                </Button>
-                            </div>
-                        </div>
-                        <div className="flex-1 flex flex-col min-h-0">
-                            {selectedVarCode && (
-                                <div className="flex-none p-2 bg-muted/50 border-b">
-                                    <pre className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                        {"//To change the predefined variables, click on predefined tab and then set the variables. \n\n" + selectedVarCode}
-                                    </pre>
-                                </div>
-                            )}
-                            <div className={cn(
-                                "flex-1 min-h-0",
-                                errors.code && "border-destructive"
-                            )}>
-                                <Editor
-                                    height="100%"
-                                    defaultLanguage="javascript"
-                                    theme={`vs-${theme}`}
-                                    value={userCode}
-                                    onChange={handleCodeChange}
-                                    options={{
-                                        minimap: { enabled: false },
-                                        fontSize: 14,
-                                        lineNumbers: 'on',
-                                        scrollBeyondLastLine: false,
-                                        automaticLayout: true,
-                                        padding: { top: 16, bottom: 16 },
-                                        wordWrap: 'on',
-                                        scrollbar: {
-                                            alwaysConsumeMouseWheel: false,
-                                        },
-                                        cursorStyle: 'line',
-                                        renderWhitespace: 'none',
-                                        fixedOverflowWidgets: true,
-                                        autoClosingBrackets: 'always',
-                                        autoClosingQuotes: 'always',
-                                        autoSurround: 'never'
-                                    }}
-                                    onValidate={handleEditorValidation}
-                                    keepCurrentModel={true}
-                                />
-                            </div>
-                        </div>
-                        {/* Error Display Section */}
-                        <div className="flex-none border-t">
-                            {errors.code && (
-                                <p className="text-sm text-destructive p-2 border-b border-destructive/50">{errors.code.message}</p>
-                            )}
-                            {editorErrors.length > 0 && (
-                                <div className="p-2 bg-destructive/20">
-                                    <div className="text-sm space-y-1">
-                                        <p className="font-medium">Validation Errors:</p>
-                                        {editorErrors.map((error, index) => (
-                                            <p key={index}>{error}</p>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            {output && output.includes('Error:') && (
-                                <p className="text-sm text-destructive p-2">{output}</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                <CodeEditorSection
+                    code={userCode}
+                    onCodeChange={handleCodeChange}
+                    selectedVarCode={selectedVarCode}
+                    method={watch('method')}
+                    endpoint={watch('endpoint')}
+                    isRunning={isRunning}
+                    onRun={handleRunCode}
+                    editorErrors={editorErrors}
+                    toolbox={toolbox}
+                    onToolboxUpdate={handleToolboxUpdate}
+                    onShowPostEndpoint={() => setShowPostEndpointDialog(true)}
+                />
 
-                {/* Right Column - Tabs */}
-                <div className="w-1/2 p-6">
-                    <div className="rounded-lg border bg-card h-full flex flex-col">
-                        <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="return" className="flex-1 flex flex-col min-h-0">
-                            <div className="flex-none flex items-center justify-between border-b px-3 py-2">
-                                <TabsList className="h-12 bg-transparent">
-                                    <TabsTrigger value="return">
-                                        Output
-                                    </TabsTrigger>
-                                    <TabsTrigger value="logs">
-                                        Logs
-                                    </TabsTrigger>
-                                    <TabsTrigger value="variables">
-                                        Pre-defined Variables
-                                    </TabsTrigger>
-                                    {watch('method') === 'POST' && (
-                                        <TabsTrigger value="request">
-                                            Request Body ( Testing )
-                                        </TabsTrigger>
-                                    )}
-                                </TabsList>
-                            </div>
-
-                            <div className="flex-1 overflow-hidden min-h-0">
-                                <TabsContent value="return" className="h-full m-0">
-                                    <div className="h-full flex flex-col min-h-0">
-                                        <div className="h-[75%] min-h-0 border-b flex flex-col">
-                                            <div className="p-4 flex-1 flex flex-col min-h-0">
-                                                <h3 className="flex-none font-semibold mb-2">Return Value</h3>
-                                                <div className="flex-1 overflow-y-auto min-h-0 rounded bg-background">
-                                                    <pre className="whitespace-pre-wrap p-2">
-                                                        {returnValue}
-                                                    </pre>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="h-[25%] min-h-0 flex flex-col">
-                                            <div className="p-4 flex-1 flex flex-col min-h-0 bg-muted/50">
-                                                <h3 className="flex-none font-semibold mb-2">Console Output</h3>
-                                                <div className="flex-1 overflow-y-auto min-h-0 rounded bg-background/50">
-                                                    <pre className="whitespace-pre-wrap p-2">
-                                                        {consoleOutput}
-                                                    </pre>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </TabsContent>
-
-                                <TabsContent value="logs" className="h-full m-0">
-                                    <div className="h-full p-4">
-                                        <LogsViewer
-                                            logs={watch('logs') || []}
-                                            pageId={resolvedParams.id}
-                                            onLogsCleared={() => {
-                                                setValue('logs', [], { shouldDirty: true })
-                                                fetchPage()
-                                            }}
-                                        />
-                                    </div>
-                                </TabsContent>
-
-                                <TabsContent value="variables" className="h-full m-0">
-                                    <div className="h-full p-4">
-                                        <div className="space-y-4 h-full flex flex-col">
-                                            <div className="flex-none flex items-center justify-between">
-                                                <div className="flex items-center space-x-2">
-                                                    <Checkbox
-                                                        id="usePreDefinedVars"
-                                                        checked={watch('preDefinedVariables') !== null}
-                                                        onCheckedChange={(checked) => {
-                                                            if (!checked) {
-                                                                setValue('preDefinedVariables', null, { shouldDirty: true });
-                                                            } else if (preDefinedVariables.length > 0) {
-                                                                setValue('preDefinedVariables', Number(preDefinedVariables[0].id), { shouldDirty: true });
-                                                            }
-                                                        }}
-                                                    />
-                                                    <Label htmlFor="usePreDefinedVars">Use Pre-defined Variables</Label>
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        setSelectedPreDefinedVar(undefined)
-                                                        setShowPreDefinedVarDialog(true)
-                                                    }}
-                                                >
-                                                    Add New Variable
-                                                </Button>
-                                            </div>
-                                            {watch('preDefinedVariables') !== null && (
-                                                <Command className="border rounded-md flex-1 overflow-auto">
-                                                    <CommandInput placeholder="Search pre-defined variables..." />
-                                                    <CommandList>
-                                                        <CommandEmpty>No results found.</CommandEmpty>
-                                                        <CommandGroup>
-                                                            {preDefinedVariables.map((variable) => (
-                                                                <CommandItem
-                                                                    key={variable.id}
-                                                                    onSelect={() => {
-                                                                        setValue('preDefinedVariables', Number(variable.id), { shouldDirty: true });
-                                                                    }}
-                                                                    className="flex items-center gap-2 cursor-pointer"
-                                                                >
-                                                                    <div
-                                                                        className="w-3 h-3 rounded-full"
-                                                                        style={{ backgroundColor: variable.color }}
-                                                                    />
-                                                                    <span>{variable.title}</span>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="ml-2"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setSelectedPreDefinedVar({
-                                                                                ...variable,
-                                                                                vars: variable.vars || '',
-                                                                                created_at: variable.created_at || new Date().toISOString()
-                                                                            });
-                                                                            setShowPreDefinedVarDialog(true);
-                                                                        }}
-                                                                    >
-                                                                        Edit
-                                                                    </Button>
-                                                                    {watch('preDefinedVariables') === Number(variable.id) && (
-                                                                        <Check className="ml-auto h-4 w-4" />
-                                                                    )}
-                                                                </CommandItem>
-                                                            ))}
-                                                        </CommandGroup>
-                                                    </CommandList>
-                                                </Command>
-                                            )}
-                                        </div>
-                                    </div>
-                                </TabsContent>
-
-                                {watch('method') === 'POST' && (
-                                    <TabsContent value="request" className="p-4 m-0 h-full">
-                                        <div className="space-y-4 h-full flex flex-col">
-                                            <div className="relative flex-1">
-                                                <Label className="mb-2 block">Request Body (JSON)</Label>
-                                                <div className="h-[calc(100%-2rem)] relative">
-                                                    <Editor
-                                                        height="100%"
-                                                        defaultLanguage="json"
-                                                        theme={`vs-${theme}`}
-                                                        value={postBody}
-                                                        onChange={(value) => setPostBody(value || '')}
-                                                        options={{
-                                                            minimap: { enabled: false },
-                                                            fontSize: 14,
-                                                            lineNumbers: 'on',
-                                                            scrollBeyondLastLine: false,
-                                                            automaticLayout: true,
-                                                            padding: { top: 16, bottom: 16 },
-                                                            wordWrap: 'on',
-                                                            scrollbar: {
-                                                                alwaysConsumeMouseWheel: false,
-                                                            },
-                                                            formatOnPaste: true,
-                                                            formatOnType: true
-                                                        }}
-                                                    />
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="absolute bottom-2 right-2 z-10"
-                                                        onClick={() => {
-                                                            try {
-                                                                const formatted = JSON.stringify(JSON.parse(postBody), null, 2)
-                                                                setPostBody(formatted)
-                                                            } catch (error) {
-                                                                toast({
-                                                                    variant: "destructive",
-                                                                    title: "Invalid JSON",
-                                                                    description: "Please enter valid JSON to format",
-                                                                })
-                                                            }
-                                                        }}
-                                                    >
-                                                        Format JSON
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </TabsContent>
-                                )}
-                            </div>
-                        </Tabs>
-                    </div>
-                </div>
+                <OutputSection
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                    returnValue={returnValue}
+                    consoleOutput={consoleOutput}
+                    logs={watch('logs') || []}
+                    pageId={resolvedParams.id}
+                    onLogsClear={() => setValue('logs', [], { shouldDirty: true })}
+                    onRefresh={fetchPage}
+                    method={watch('method')}
+                    postBody={postBody}
+                    onPostBodyChange={(value) => setPostBody(value || '')}
+                    preDefinedVariables={preDefinedVariables}
+                    selectedPreDefinedVarId={watch('preDefinedVariables')}
+                    onPreDefinedVarChange={(id) => setValue('preDefinedVariables', id)}
+                    onAddNewVar={() => {
+                        setSelectedPreDefinedVar(undefined)
+                        setShowPreDefinedVarDialog(true)
+                    }}
+                    onEditVar={(variable) => {
+                        setSelectedPreDefinedVar({
+                            ...variable,
+                            vars: variable.vars || '',
+                            created_at: variable.created_at || new Date().toISOString()
+                        })
+                        setShowPreDefinedVarDialog(true)
+                    }}
+                />
             </div>
 
             <PreDefinedVariableDialog
                 open={showPreDefinedVarDialog}
                 onOpenChange={setShowPreDefinedVarDialog}
                 preDefinedVariable={selectedPreDefinedVar}
-                onSuccess={handlePreDefinedVarSuccess}
+                onSuccess={async () => {
+                    try {
+                        const vars = await getPreDefinedVariables()
+                        setPreDefinedVariables(vars)
+                    } catch (error) {
+                        toast({
+                            variant: "destructive",
+                            title: "Error",
+                            description: "Failed to refresh pre-defined variables",
+                        })
+                    }
+                }}
             />
 
-            {/* POST Endpoint Dialog */}
-            <Dialog open={showPostEndpointDialog} onOpenChange={setShowPostEndpointDialog}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>POST Endpoint Options</DialogTitle>
-                        <DialogDescription>
-                            Choose how you want to interact with this POST endpoint
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex flex-col gap-4 py-4">
-                        <Button
-                            onClick={() => {
-                                const url = getEndpointUrl();
-                                try {
-                                    // Parse and re-stringify to ensure valid JSON
-                                    const parsedBody = JSON.parse(postBody);
-                                    const formattedBody = JSON.stringify({ data: parsedBody });
-
-                                    // Create Postman collection data
-                                    const postmanData = {
-                                        info: {
-                                            name: watch('title') || 'API Request',
-                                            schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-                                        },
-                                        item: [{
-                                            name: watch('title') || 'API Request',
-                                            request: {
-                                                method: 'POST',
-                                                header: [
-                                                    {
-                                                        key: 'Content-Type',
-                                                        value: 'application/json'
-                                                    }
-                                                ],
-                                                url: {
-                                                    raw: url,
-                                                    protocol: window.location.protocol.replace(':', ''),
-                                                    host: window.location.host.split('.'),
-                                                    path: url.replace(/^https?:\/\/[^\/]+/, '').split('/')
-                                                },
-                                                body: {
-                                                    mode: 'raw',
-                                                    raw: formattedBody,
-                                                    options: {
-                                                        raw: {
-                                                            language: 'json'
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }]
-                                    };
-
-                                    // Create Postman URL with the correct format
-                                    const postmanUrl = `https://go.postman.co/import?input=${encodeURIComponent(JSON.stringify(postmanData))}`;
-                                    window.open(postmanUrl, '_blank');
-                                    setShowPostEndpointDialog(false);
-                                } catch (error) {
-                                    toast({
-                                        variant: "destructive",
-                                        title: "Invalid JSON",
-                                        description: "Please enter valid JSON in the request body",
-                                    })
-                                }
-                            }}
-                            className="gap-2"
-                        >
-                            <ExternalLink className="h-4 w-4" />
-                            Test in Postman
-                        </Button>
-
-                        <Button
-                            onClick={() => {
-                                const url = getEndpointUrl()
-                                navigator.clipboard.writeText(url)
-                                toast({
-                                    title: "Success",
-                                    description: "API URL copied to clipboard",
-                                })
-                                setShowPostEndpointDialog(false)
-                            }}
-                            variant="outline"
-                            className="gap-2"
-                        >
-                            <Copy className="h-4 w-4" />
-                            Copy API URL
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <PostEndpointDialog
+                open={showPostEndpointDialog}
+                onOpenChange={setShowPostEndpointDialog}
+                endpoint={watch('endpoint')}
+                title={watch('title')}
+                postBody={postBody}
+            />
         </div>
     )
 }

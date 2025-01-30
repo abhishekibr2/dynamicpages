@@ -32,9 +32,10 @@ interface LogsViewerProps {
     logs: Log[];
     pageId: string;
     onLogsCleared: () => void;
+    onRefresh: () => void;
 }
 
-export function LogsViewer({ logs, pageId, onLogsCleared }: LogsViewerProps) {
+export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewerProps) {
     const { toast } = useToast()
     const [selectedLog, setSelectedLog] = useState<Log | null>(null)
 
@@ -67,7 +68,7 @@ export function LogsViewer({ logs, pageId, onLogsCleared }: LogsViewerProps) {
                     <Button
                         variant="secondary"
                         size="sm"
-                        onClick={onLogsCleared}
+                        onClick={onRefresh}
                         className="gap-2 hover:shadow-sm transition-all"
                     >
                         <RefreshCcw className="h-4 w-4" />
@@ -156,25 +157,69 @@ export function LogsViewer({ logs, pageId, onLogsCleared }: LogsViewerProps) {
                             <div>
                                 <h3 className="text-sm font-medium mb-2">Request</h3>
                                 <div className="rounded-md bg-muted/50 p-4">
-                                    <pre className="text-sm whitespace-pre-wrap font-mono">{selectedLog.request}</pre>
+                                    <pre className="text-sm whitespace-pre-wrap font-mono">
+                                        {(() => {
+                                            if (selectedLog.request) {
+                                                try {
+                                                    return JSON.stringify(JSON.parse(selectedLog.request), null, 2);
+                                                } catch {
+                                                    return selectedLog.request;
+                                                }
+                                            }
+                                            return selectedLog.request;
+                                        })()}
+                                    </pre>
                                 </div>
                             </div>
                             <div>
                                 <h3 className="text-sm font-medium mb-2">Output</h3>
                                 <div className="rounded-md bg-muted/50 p-4">
-                                    <pre className="text-sm whitespace-pre-wrap font-mono">{selectedLog.output}</pre>
+                                    <pre className="text-sm whitespace-pre-wrap font-mono">
+                                        {(() => {
+                                            if (selectedLog.output) {
+                                                try {
+                                                    return JSON.stringify(JSON.parse(selectedLog.output), null, 2);
+                                                } catch {
+                                                    return selectedLog.output;
+                                                }
+                                            }
+                                            return selectedLog.output;
+                                        })()}
+                                    </pre>
                                 </div>
                             </div>
                             <div>
                                 <h3 className="text-sm font-medium mb-2">Console Output</h3>
                                 <div className="rounded-md bg-muted/50 p-4">
-                                    <pre className="text-sm whitespace-pre-wrap font-mono">{selectedLog.console}</pre>
+                                    <pre className="text-sm whitespace-pre-wrap font-mono">
+                                        {(() => {
+                                            if (selectedLog.console) {
+                                                try {
+                                                    return JSON.stringify(JSON.parse(selectedLog.console), null, 2);
+                                                } catch {
+                                                    return selectedLog.console;
+                                                }
+                                            }
+                                            return selectedLog.console;
+                                        })()}
+                                    </pre>
                                 </div>
                             </div>
                             <div>
                                 <h3 className="text-sm font-medium mb-2">Return Value</h3>
                                 <div className="rounded-md bg-muted/50 p-4">
-                                    <pre className="text-sm whitespace-pre-wrap font-mono">{selectedLog.returnValue}</pre>
+                                    <pre className="text-sm whitespace-pre-wrap font-mono">
+                                        {(() => {
+                                            if (selectedLog.returnValue) {
+                                                try {
+                                                    return JSON.stringify(JSON.parse(selectedLog.returnValue), null, 2);
+                                                } catch {
+                                                    return selectedLog.returnValue;
+                                                }
+                                            }
+                                            return selectedLog.returnValue;
+                                        })()}
+                                    </pre>
                                 </div>
                             </div>
                         </div>
