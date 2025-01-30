@@ -1,0 +1,41 @@
+const fetch = require('node-fetch');
+
+const query_data = $array_of_fields;  //return query_data;
+const jsonObject = JSON.parse(query_data); //return query_json;
+ if (!Array.isArray(jsonObject.data)) {
+       jsonObject = convertToDataIndex(jsonObject); //return r; 
+       //obj.data = []; // Initialize 'data' as an empty array
+    }
+// New array to add
+const rankingFor = ["linkedin.com", "ibrinfotech.com", "vocal.com"];
+// Add the new array to the JSON object
+jsonObject["ranking_for"] = rankingFor;
+
+//const r = convertToDataIndex(query_json); //return r;
+//const raw = JSON.stringify(r);
+const raw = JSON.stringify(jsonObject);
+
+//return raw;
+//const raw = JSON.stringify($array_of_fields);
+const url = 'https://dynamicpages.vercel.app/api/{page endpoint}';
+const options = {
+    method: '{page method}',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: raw,
+};
+try {
+    const response = await fetch(url, options);
+    const text = await response.text();
+  const json = JSON.parse(text);
+    return json.output; // Return only the "output" field
+    //return text;
+} catch (error) {
+    console.error(error);
+    return '';
+}
+
+function convertToDataIndex(inputArray) {
+  return { data: inputArray };
+}

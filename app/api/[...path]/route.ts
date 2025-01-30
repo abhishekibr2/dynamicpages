@@ -75,7 +75,6 @@ const executeCodeInVM = (code: string, context: any, timeout = 5000, extractedVa
         },
         request: context.request,
         response: context.response,
-        data: context.request.body?.data,
         setTimeout,
         clearTimeout,
         Promise
@@ -199,7 +198,12 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
       }
       
       return NextResponse.json(
-        { error: 'Endpoint not found' },
+        { 
+          status: "error",
+          code: 404,
+          message: "Endpoint not found",
+          data: null
+        },
         { status: 404 }
       )
     }
@@ -252,19 +256,25 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
 
     if (!result.success) {
       return NextResponse.json({
-        success: false,
-        output: result.logs.join('\n'),
-        error: result.error,
-        ...(logs ? { logs: result.logs } : {})
+        status: "error",
+        code: 400,
+        message: result.error || "Execution failed",
+        data: {
+          output: result.logs.join('\n'),
+          ...(logs ? { logs: result.logs } : {})
+        }
       }, { status: 400 })
     }
 
     return NextResponse.json(
       {
-        success: true,
-        output: result.result,
-        error: null,
-        ...(logs ? { logs: result.logs.join('\n') || 'No console output' } : {})
+        status: "success",
+        code: result.response?.status || 200,
+        message: "Operation completed successfully",
+        data: {
+          output: result.result,
+          ...(logs ? { logs: result.logs.join('\n') || 'No console output' } : {})
+        }
       },
       {
         status: result.response?.status || 200,
@@ -290,12 +300,14 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
 
     return NextResponse.json(
       {
-        success: false,
-        output: null,
-        error: `Server Error: ${error.message}`,
-        details: error.stack,
-        lineNumber: null,
-        ...(logs ? { logs: [error.message, error.stack].filter(Boolean) } : {})
+        status: "error",
+        code: 500,
+        message: `Server Error: ${error.message}`,
+        data: {
+          details: error.stack,
+          lineNumber: null,
+          ...(logs ? { logs: [error.message, error.stack].filter(Boolean) } : {})
+        }
       },
       { status: 500 }
     )
