@@ -7,6 +7,7 @@ import Editor from "@monaco-editor/react"
 import { Settings2, ExternalLink, Play } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Toolbox } from "@/types/Toolbox"
+import { MovingBorderButton } from "@/components/ui/moving-border"
 
 interface CodeEditorSectionProps {
     code: string
@@ -50,8 +51,8 @@ export function CodeEditorSection({
                 <div className="flex-none flex items-center justify-between border-b px-3 py-2">
                     <div className="flex items-center gap-2">
                         <h3 className="font-semibold">Code Editor</h3>
-                        <Button 
-                            variant="outline" 
+                        <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => setShowToolboxDialog(true)}
                         >
@@ -81,16 +82,13 @@ export function CodeEditorSection({
                                 Endpoint Options
                             </Button>
                         )}
-                        <Button
+                        <button className="inline-flex h-9 animate-shimmer items-center justify-center rounded-md border border-slate-800 dark:border-slate-700 bg-[linear-gradient(110deg,#f5f5f5,45%,#ffffff,55%,#f5f5f5)] dark:bg-[linear-gradient(110deg,#000103,45%,#1e2631,55%,#000103)] bg-[length:200%_100%] px-6 font-medium text-slate-900 dark:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-700 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 gap-2"
                             onClick={onRun}
                             disabled={isRunning}
-                            size="sm"
-                            variant="default"
-                            className="gap-2"
                         >
                             <Play className="h-4 w-4" />
                             {isRunning ? 'Running...' : 'Run Code'}
-                        </Button>
+                        </button>
                     </div>
                 </div>
                 <div className="flex-1 flex flex-col min-h-0">
@@ -176,7 +174,7 @@ export function CodeEditorSection({
                             />
                         </div>
                         <div className="flex justify-end">
-                            <Button 
+                            <Button
                                 onClick={() => {
                                     onToolboxUpdate(localToolboxDescription)
                                     setShowToolboxDialog(false)

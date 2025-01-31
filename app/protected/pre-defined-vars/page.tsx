@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { PreDefinedVariable } from "@/types/PreDefinedVariable"
 import { PreDefinedVariableTable } from "../components/PreDefinedVariablesTable"
 import { PreDefinedVariableDialog } from "../components/PreDefinedVariablesDialog"
+import Link from "next/link"
 
 export default function ProtectedPreDefinedVariable() {
     const [selectedPreDefinedVariable, setSelectedPreDefinedVariable] = useState<PreDefinedVariable>()
@@ -73,19 +74,14 @@ export default function ProtectedPreDefinedVariable() {
     }, [lastKeyPress, lastKeyPressTime])
 
     return (
-        <div className="flex flex-col h-full w-[60%]">
-            <div className="w-full mb-4">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => handleNavigation('back')}
-                >
+        <div className="flex h-full w-[60%] flex-col">
+            <Link href="/protected" className="max-w-fit">
+                <div className="flex items-center gap-2 border rounded-md px-2 py-1 mt-2 bg-muted">
                     <ArrowLeft className="h-4 w-4" />
                     Back
-                </Button>
-            </div>
-            <div className="flex-1 min-h-0 w-full">
+                </div>
+            </Link>
+            <div className="flex-1 min-h-0 w-full bg-card rounded-lg shadow-sm p-4 mt-2">
                 <PreDefinedVariableTable
                     ref={tableRef}
                     onEdit={handleEdit}
