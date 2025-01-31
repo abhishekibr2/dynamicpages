@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Settings2, Code2 } from "lucide-react"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import Link from "next/link"
 
 interface PageHeaderProps {
     title: string
@@ -35,15 +36,12 @@ export function PageHeader({
         <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="w-full px-6 flex h-14 items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => onNavigate('back')}
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back
-                    </Button>
+                    <Link href="/protected">
+                        <div className="flex items-center gap-2 border rounded-md px-2 py-1 bg-muted">
+                            <ArrowLeft className="h-4 w-4" />
+                            Back
+                        </div>
+                    </Link>
                     <h1 className="text-xl font-semibold">
                         {title || (isNewPage ? 'Create New Page' : 'Edit Page')}
                         {hasUnsavedChanges && <span className="ml-2 text-sm text-muted-foreground">(Unsaved changes)</span>}
