@@ -18,6 +18,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { useState } from "react"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Log {
     timestamp: string;
@@ -38,6 +39,7 @@ interface LogsViewerProps {
 export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewerProps) {
     const { toast } = useToast()
     const [selectedLog, setSelectedLog] = useState<Log | null>(null)
+    const [isRefreshing, setIsRefreshing] = useState(false)
 
     const handleClearLogs = async () => {
         try {
@@ -56,9 +58,35 @@ export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewe
         }
     }
 
+    const handleRefresh = async () => {
+        setIsRefreshing(true)
+        try {
+            await onRefresh()
+        } finally {
+            setIsRefreshing(false)
+        }
+    }
+
     const formatDate = (timestamp: string) => {
         return new Date(timestamp).toLocaleString()
     }
+
+    const LogsSkeleton = () => (
+        <TableRow>
+            <TableCell>
+                <Skeleton className="h-4 w-[160px]" />
+            </TableCell>
+            <TableCell>
+                <div className="flex items-center gap-2">
+                    <Skeleton className="h-2 w-2 rounded-full" />
+                    <Skeleton className="h-4 w-[60px]" />
+                </div>
+            </TableCell>
+            <TableCell className="text-right">
+                <Skeleton className="h-8 w-8 ml-auto" />
+            </TableCell>
+        </TableRow>
+    )
 
     return (
         <div className="flex flex-col h-full">
@@ -68,16 +96,18 @@ export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewe
                     <Button
                         variant="secondary"
                         size="sm"
-                        onClick={onRefresh}
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
                         className="gap-2 hover:shadow-sm transition-all"
                     >
-                        <RefreshCcw className="h-4 w-4" />
-                        Refresh
+                        <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        {isRefreshing ? 'Refreshing...' : 'Refresh'}
                     </Button>
                     <Button
                         variant="destructive"
                         size="sm"
                         onClick={handleClearLogs}
+                        disabled={isRefreshing}
                         className="gap-2 hover:shadow-sm transition-all"
                     >
                         <Trash2 className="h-4 w-4" />
@@ -96,7 +126,11 @@ export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewe
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {logs.length === 0 ? (
+                        {isRefreshing ? (
+                            Array.from({ length: 5 }).map((_, index) => (
+                                <LogsSkeleton key={index} />
+                            ))
+                        ) : logs.length === 0 ? (
                             <TableRow>
                                 <TableCell
                                     colSpan={3}

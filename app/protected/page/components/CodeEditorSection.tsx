@@ -87,7 +87,7 @@ export function CodeEditorSection({
                             disabled={isRunning}
                         >
                             <Play className="h-4 w-4" />
-                            {isRunning ? 'Running...' : 'Run Code'}
+                            {isRunning ? 'Running...' : 'Run Code (Ctrl+R)'}
                         </button>
                     </div>
                 </div>

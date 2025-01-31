@@ -2,7 +2,7 @@ import { Skeleton } from "./ui/skeleton";
 
 export default function SkeletonTable() {
     return (
-        <div className="rounded-md border">
+        <div className="rounded-md border bg-background">
             <div className="w-full">
                 {/* Table Header */}
                 <div className="bg-muted/100 border-b">
