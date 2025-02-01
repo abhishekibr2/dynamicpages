@@ -41,6 +41,17 @@ export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewe
     const [selectedLog, setSelectedLog] = useState<Log | null>(null)
     const [isRefreshing, setIsRefreshing] = useState(false)
 
+    const formatJSON = (data: any): string => {
+        try {
+            // If data is already a string, try to parse it first
+            const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+            return JSON.stringify(parsed, null, 2);
+        } catch (error) {
+            // If parsing fails, return the original data as is
+            return typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+    }
+
     const handleClearLogs = async () => {
         try {
             await clearLogs(pageId)
@@ -192,7 +203,7 @@ export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewe
                                 <h3 className="text-sm font-medium mb-2">Request</h3>
                                 <div className="rounded-md bg-muted/50 p-4">
                                     <pre className="text-sm whitespace-pre-wrap font-mono">
-                                        {selectedLog.request}
+                                        {formatJSON(selectedLog.request)}
                                     </pre>
                                 </div>
                             </div>
@@ -200,7 +211,7 @@ export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewe
                                 <h3 className="text-sm font-medium mb-2">Output</h3>
                                 <div className="rounded-md bg-muted/50 p-4">
                                     <pre className="text-sm whitespace-pre-wrap font-mono">
-                                        {selectedLog.output}
+                                        {formatJSON(selectedLog.output)}
                                     </pre>
                                 </div>
                             </div>
@@ -208,7 +219,7 @@ export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewe
                                 <h3 className="text-sm font-medium mb-2">Console Output</h3>
                                 <div className="rounded-md bg-muted/50 p-4">
                                     <pre className="text-sm whitespace-pre-wrap font-mono">
-                                        {selectedLog.console}
+                                        {formatJSON(selectedLog.console)}
                                     </pre>
                                 </div>
                             </div>
@@ -216,7 +227,7 @@ export function LogsViewer({ logs, pageId, onLogsCleared, onRefresh }: LogsViewe
                                 <h3 className="text-sm font-medium mb-2">Return Value</h3>
                                 <div className="rounded-md bg-muted/50 p-4">
                                     <pre className="text-sm whitespace-pre-wrap font-mono">
-                                        {selectedLog.returnValue}
+                                        {formatJSON(selectedLog.returnValue)}
                                     </pre>
                                 </div>
                             </div>
