@@ -198,6 +198,8 @@ export default function PageEditor({ params }: PageEditorProps) {
                 test_post_body: null,
                 logs: []
             });
+            // Show page info dialog for new page
+            setShowPageInfoDialog(true)
         }
     }, [resolvedParams.id])
 
