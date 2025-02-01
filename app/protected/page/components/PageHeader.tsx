@@ -79,7 +79,7 @@ export function PageHeader({
                         onClick={onSave}
                         variant="default"
                     >
-                        {isNewPage ? 'Create' : 'Save Changes'}
+                        {isNewPage ? 'Create' : 'Save Changes(Ctrl+S)'}
                     </Button>
                     {!isNewPage && (
                         <AlertDialog>

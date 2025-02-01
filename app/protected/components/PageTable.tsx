@@ -45,7 +45,7 @@ export function PageTable() {
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border bg-background">
       <Table>
         <TableHeader className="bg-muted/100">
           <TableRow>

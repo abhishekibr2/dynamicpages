@@ -55,6 +55,8 @@ export default function PageEditor({ params }: PageEditorProps) {
     const [userCode, setUserCode] = useState<string>('')
     const [actualCode, setActualCode] = useState<string>('')
     const [initialFormState, setInitialFormState] = useState<PageFormData | null>(null)
+    const [lastKeyPress, setLastKeyPress] = useState<string>('')
+    const [lastKeyPressTime, setLastKeyPressTime] = useState<number>(0)
 
 
     const {
@@ -196,6 +198,8 @@ export default function PageEditor({ params }: PageEditorProps) {
                 test_post_body: null,
                 logs: []
             });
+            // Show page info dialog for new page
+            setShowPageInfoDialog(true)
         }
     }, [resolvedParams.id])
 
@@ -549,12 +553,66 @@ function convertToDataIndex(inputArray) {
         return code
     }
 
+    useEffect(() => {
+        const handleKeyPress = (e: KeyboardEvent) => {
+            const currentTime = Date.now()
+            const newLastKey = e.key.toLowerCase()
+
+            if (newLastKey === 's') {
+                const timeDiff = currentTime - lastKeyPressTime
+                if (lastKeyPress === 's' && timeDiff <= 500) {
+                    handleNavigation('back')
+                    setLastKeyPress('')
+                    setLastKeyPressTime(0)
+                } else {
+                    setLastKeyPress('s')
+                    setLastKeyPressTime(currentTime)
+                }
+            } else {
+                setLastKeyPress('')
+                setLastKeyPressTime(0)
+            }
+        }
+
+        const handleKeyDown = async (e: KeyboardEvent) => {
+            // Check for Ctrl+S (Windows) or Cmd+S (Mac)
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault() // Prevent browser's save dialog
+                if (!isLoading) {
+                    await handleFormSubmit(onSubmit)()
+                    toast({
+                        title: "Success",
+                        description: "Page saved successfully",
+                    })
+                }
+            }
+            // Check for Ctrl+R (Windows) or Cmd+R (Mac)
+            else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') {
+                e.preventDefault() // Prevent browser refresh
+                if (!isLoading && !isRunning) {
+                    handleRunCode()
+                    toast({
+                        title: "Running",
+                        description: "Code execution started",
+                    })
+                }
+            }
+        }
+
+        window.addEventListener('keypress', handleKeyPress)
+        window.addEventListener('keydown', handleKeyDown)
+        return () => {
+            window.removeEventListener('keypress', handleKeyPress)
+            window.removeEventListener('keydown', handleKeyDown)
+        }
+    }, [lastKeyPress, lastKeyPressTime, isLoading, isRunning, handleFormSubmit, onSubmit, handleRunCode])
+
     if (isLoading) {
         return <SkeletonPage />
     }
 
     return (
-        <div className="bg-background w-full">
+        <div className=" w-full">
             <PageHeader
                 title={watch('title')}
                 hasUnsavedChanges={hasUnsavedChanges}
