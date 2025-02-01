@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button"
 import { ExternalLink, Copy } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useState } from "react"
 
 interface PostEndpointDialogProps {
     open: boolean
@@ -21,7 +22,7 @@ export function PostEndpointDialog({
     postBody
 }: PostEndpointDialogProps) {
     const { toast } = useToast()
-
+    const [url, setUrl] = useState<string>(`${window.location.origin}/api${endpoint}`)
     const getEndpointUrl = () => {
         const baseUrl = `${window.location.origin}/api${endpoint}`
         return baseUrl
@@ -34,6 +35,9 @@ export function PostEndpointDialog({
                     <DialogTitle>POST Endpoint Options</DialogTitle>
                     <DialogDescription>
                         Choose how you want to interact with this POST endpoint
+                    </DialogDescription>
+                    <DialogDescription>
+                        API Endpoint : {url}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-4 py-4">
