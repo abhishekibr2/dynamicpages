@@ -50,13 +50,13 @@ export function PageHeader({
                 <div className="flex items-center gap-2">
                     {!isNewPage && (
                         <Button
-                            variant="outline"
+                            variant="link"
                             size="sm"
                             onClick={onShowGeneratedCode}
                             className="gap-2"
                         >
                             <Code2 className="h-4 w-4" />
-                            View Code
+                            Use In Flowise
                         </Button>
                     )}
                     <Button

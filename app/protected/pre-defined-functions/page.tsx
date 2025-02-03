@@ -4,36 +4,42 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { PreDefinedVariable } from "@/types/PreDefinedVariable"
-import { PreDefinedVariableTable } from "./components/PreDefinedVariablesTable"
-import { PreDefinedVariableDialog } from "./components/PreDefinedVariablesDialog"
-import Link from "next/link"
+import { PreDefinedFunction } from "@/types/PreDefinedFunctions"
 
-export default function ProtectedPreDefinedVariable() {
-    const [selectedPreDefinedVariable, setSelectedPreDefinedVariable] = useState<PreDefinedVariable>()
+import Link from "next/link"
+import { PreDefinedFunctionTable } from "./components/PreDefinedFunctionssTable"
+import { PreDefinedFunctionDialog } from "./components/PreDefinedFunctionsDialog"
+
+
+export default function ProtectedPreDefinedFunctions() {
+    const [selectedPreDefinedFunction, setSelectedPreDefinedFunction] = useState<PreDefinedFunction>()
     const [dialogOpen, setDialogOpen] = useState(false)
-    const tableRef = useRef<{ fetchPreDefinedVariables: () => void }>({ fetchPreDefinedVariables: () => { } })
+    const tableRef = useRef<{ fetchPreDefinedFunctions: () => void }>({ fetchPreDefinedFunctions: () => { } })
     const router = useRouter()
     const [lastKeyPress, setLastKeyPress] = useState<string>('')
+
     const [lastKeyPressTime, setLastKeyPressTime] = useState<number>(0)
     const [showUnsavedAlert, setShowUnsavedAlert] = useState(false)
     const [pendingNavigation, setPendingNavigation] = useState<'back' | 'cancel' | null>(null)
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
-    const handleEdit = (preDefinedVariable: PreDefinedVariable) => {
-        setSelectedPreDefinedVariable(preDefinedVariable)
+    const handleEdit = (preDefinedFunction: PreDefinedFunction) => {
+        setSelectedPreDefinedFunction(preDefinedFunction)
         setDialogOpen(true)
     }
+
 
     const handleAddNew = () => {
-        setSelectedPreDefinedVariable(undefined)
+        setSelectedPreDefinedFunction(undefined)
         setDialogOpen(true)
     }
 
+
     const handleSuccess = () => {
-        tableRef.current.fetchPreDefinedVariables()
+        tableRef.current.fetchPreDefinedFunctions()
         setDialogOpen(false)
     }
+
 
     const handleNavigation = (type: 'back' | 'cancel') => {
         if (hasUnsavedChanges) {
@@ -82,17 +88,19 @@ export default function ProtectedPreDefinedVariable() {
                 </div>
             </Link>
             <div className="flex-1 min-h-0 w-full bg-card rounded-lg shadow-sm p-4 mt-2">
-                <PreDefinedVariableTable
+                <PreDefinedFunctionTable
                     ref={tableRef}
                     onEdit={handleEdit}
                     onAddNew={handleAddNew}
+
                 />
             </div>
-            <PreDefinedVariableDialog
-                preDefinedVariable={selectedPreDefinedVariable}
+            <PreDefinedFunctionDialog
+                preDefinedFunction={selectedPreDefinedFunction}
                 open={dialogOpen}
                 onOpenChange={setDialogOpen}
                 onSuccess={handleSuccess}
+
             />
         </div>
     )
