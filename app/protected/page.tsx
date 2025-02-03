@@ -1,6 +1,6 @@
 'use client'
 
-import { PageTable } from "./components/PageTable"
+import { PageTable } from "./pre-defined-vars/components/PageTable"
 import Link from "next/link"
 
 export default function ProtectedPage() {
@@ -15,6 +15,9 @@ export default function ProtectedPage() {
           </Link>
           <Link href="/protected/pre-defined-vars" className="bg-primary hover:bg-primary/90 text-background px-4 py-2 rounded-md">
             Pre-defined Variables
+          </Link>
+          <Link href="/protected/pre-defined-functions" className="bg-primary hover:bg-primary/90 text-background px-4 py-2 rounded-md">
+            Pre-defined Functions
           </Link>
         </div>
       </div>

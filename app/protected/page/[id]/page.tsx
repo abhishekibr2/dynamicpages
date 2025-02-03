@@ -8,7 +8,7 @@ import { use } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { getPreDefinedVariables } from "@/utils/supabase/actions/preDefinedVars"
-import { PreDefinedVariableDialog } from "../../components/PreDefinedVariablesDialog"
+import { PreDefinedVariableDialog } from "../../pre-defined-vars/components/PreDefinedVariablesDialog"
 import { PreDefinedVariable } from "@/types/PreDefinedVariable"
 import { getToolbox, updateToolbox } from "@/utils/supabase/actions/toolTip"
 import { Toolbox } from "@/types/Toolbox"
@@ -20,6 +20,8 @@ import { CodeEditorSection } from "../components/CodeEditorSection"
 import { OutputSection } from "../components/OutputSection"
 import { PostEndpointDialog } from "../components/PostEndpointDialog"
 import { GeneratedCodeDialog } from "../components/GeneratedCodeDialog"
+import { getPreDefinedFunctions } from "@/utils/supabase/actions/preDefinedFunctions"
+import { PreDefinedFunction } from "@/types/PreDefinedFunctions"
 
 interface PageEditorProps {
     params: Promise<{
@@ -57,7 +59,7 @@ export default function PageEditor({ params }: PageEditorProps) {
     const [initialFormState, setInitialFormState] = useState<PageFormData | null>(null)
     const [lastKeyPress, setLastKeyPress] = useState<string>('')
     const [lastKeyPressTime, setLastKeyPressTime] = useState<number>(0)
-
+    const [preDefinedFunctions, setPreDefinedFunctions] = useState<PreDefinedFunction[]>([])
 
     const {
         register,
@@ -439,7 +441,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                     return
                 }
             }
-
+            console.log(watch('preDefinedVariables'))
             const response = await fetch(`/api${watch('endpoint')}?preDefinedVariables=${watch('preDefinedVariables')}&logs=true`, requestConfig)
             const data = await response.json()
 
@@ -607,6 +609,26 @@ function convertToDataIndex(inputArray) {
         }
     }, [lastKeyPress, lastKeyPressTime, isLoading, isRunning, handleFormSubmit, onSubmit, handleRunCode])
 
+    useEffect(() => {
+        const loadFunctions = async () => {
+            try {
+                const functions = await getPreDefinedFunctions()
+                setPreDefinedFunctions(functions)
+            } catch (error) {
+                console.error('Failed to load pre-defined functions:', error)
+            }
+        }
+        loadFunctions()
+    }, [])
+
+    const handleInsertFunction = (functionCode: string) => {
+        const currentValue = userCode
+        const newValue = functionCode + "\n\n" + currentValue
+        setUserCode(newValue)
+        setActualCode(newValue)
+        setValue('code', newValue, { shouldDirty: true })
+    }
+
     if (isLoading) {
         return <SkeletonPage />
     }
@@ -684,6 +706,8 @@ function convertToDataIndex(inputArray) {
                         })
                         setShowPreDefinedVarDialog(true)
                     }}
+                    preDefinedFunctions={preDefinedFunctions}
+                    onInsertFunction={handleInsertFunction}
                 />
             </div>
 

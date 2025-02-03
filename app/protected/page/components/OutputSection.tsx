@@ -1,7 +1,7 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { LogsViewer } from "../../components/LogsViewer"
+import { LogsViewer } from "../../pre-defined-vars/components/LogsViewer"
 import Editor from "@monaco-editor/react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,9 @@ import { Check } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { PreDefinedVariable } from "@/types/PreDefinedVariable"
 import { Log } from "../types"
+import { PreDefinedFunction } from "@/types/PreDefinedFunctions"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 
 interface OutputSectionProps {
     activeTab: string
@@ -29,6 +32,8 @@ interface OutputSectionProps {
     onPreDefinedVarChange: (id: number | null) => void
     onAddNewVar: () => void
     onEditVar: (variable: PreDefinedVariable) => void
+    preDefinedFunctions: PreDefinedFunction[]
+    onInsertFunction: (functionCode: string) => void
 }
 
 export function OutputSection({
@@ -47,7 +52,9 @@ export function OutputSection({
     selectedPreDefinedVarId,
     onPreDefinedVarChange,
     onAddNewVar,
-    onEditVar
+    onEditVar,
+    preDefinedFunctions,
+    onInsertFunction
 }: OutputSectionProps) {
     const { theme } = useTheme()
 
@@ -71,8 +78,13 @@ export function OutputSection({
                                     Request Body ( Testing )
                                 </TabsTrigger>
                             )}
+                            <TabsTrigger value="functions">
+                                Pre-defined Functions
+                            </TabsTrigger>
                         </TabsList>
+
                     </div>
+
 
                     <div className="flex-1 overflow-hidden min-h-0">
                         <TabsContent value="return" className="h-full m-0">
@@ -231,6 +243,40 @@ export function OutputSection({
                                 </div>
                             </TabsContent>
                         )}
+
+                        <TabsContent value="functions" className="p-4 m-0 h-full">
+                            <div className="space-y-4 h-full flex flex-col">
+                                <div className="flex-none flex items-center justify-between">
+                                    <Label className="text-lg font-semibold">Pre-defined Functions</Label>
+                                </div>
+                                <ScrollArea className="flex-1">
+                                    <div className="space-y-4">
+                                        {preDefinedFunctions.map((func) => (
+                                            <Card key={func.id}>
+                                                <CardHeader className="p-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <CardTitle className="text-base">{func.function_name}</CardTitle>
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() => onInsertFunction(func.function)}
+                                                        >
+                                                            Insert
+                                                        </Button>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="p-4 pt-0">
+                                                    <div className="bg-muted rounded-md p-2">
+                                                        <pre className="text-sm whitespace-pre-wrap">
+                                                            {func.function}
+                                                        </pre>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </div>
+                        </TabsContent>
                     </div>
                 </Tabs>
             </div>

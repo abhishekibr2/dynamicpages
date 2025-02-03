@@ -41,10 +41,12 @@ export function GeneratedCodeDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl">
                 <DialogHeader>
-                    <DialogTitle>Generated Code</DialogTitle>
+                    <DialogTitle>Use In Flowise</DialogTitle>
                     <DialogDescription>
-                        View and copy the generated code for this page.
+                        You can copy paste the code below in flowise tool to call this endpoint.
                     </DialogDescription>
+
+
                 </DialogHeader>
                 <div className="space-y-4">
                     <div className="h-[500px] border rounded-md overflow-hidden relative">

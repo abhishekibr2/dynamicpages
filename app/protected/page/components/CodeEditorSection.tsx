@@ -82,8 +82,10 @@ export function CodeEditorSection({
                                 Endpoint Options
                             </Button>
                         )}
-                        <button className="inline-flex h-9 animate-shimmer items-center justify-center rounded-md border border-slate-800 dark:border-slate-700 bg-[linear-gradient(110deg,#f5f5f5,45%,#ffffff,55%,#f5f5f5)] dark:bg-[linear-gradient(110deg,#000103,45%,#1e2631,55%,#000103)] bg-[length:200%_100%] px-6 font-medium text-slate-900 dark:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-700 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 gap-2"
+                        <button className="inline-flex h-9 animate-shimmer items-center justify-center rounded-md border border-slate-800 dark:border-slate-700 bg-[linear-gradient(110deg,#f5f5f5,45%,#ffffff,55%,#f5f5f5)] dark:bg-[linear-gradient(110deg,#000103,45%,#1e2631,55%,#000103)] bg-[length:200%_100%] px-6 font-medium text-slate-900 dark:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-700 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 gap-2 whitespace-nowrap"
                             onClick={onRun}
+
+
                             disabled={isRunning}
                         >
                             <Play className="h-4 w-4" />
