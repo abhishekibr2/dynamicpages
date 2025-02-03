@@ -36,7 +36,7 @@ export function PageHeader({
         <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="w-full px-6 flex h-14 items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Link href="/protected">
+                    <Link href="/protected/pages">
                         <div className="flex items-center gap-2 border rounded-md px-2 py-1 bg-muted">
                             <ArrowLeft className="h-4 w-4" />
                             Back

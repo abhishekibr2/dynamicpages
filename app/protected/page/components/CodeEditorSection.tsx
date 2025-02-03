@@ -8,11 +8,22 @@ import { Settings2, ExternalLink, Play } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Toolbox } from "@/types/Toolbox"
 import { MovingBorderButton } from "@/components/ui/moving-border"
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion"
+import { cn } from "@/lib/utils"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
 interface CodeEditorSectionProps {
     code: string
     onCodeChange: (value: string | undefined) => void
     selectedVarCode: string
+    selectedVarName?: string
     method: string
     endpoint: string
     isRunning: boolean
@@ -21,12 +32,15 @@ interface CodeEditorSectionProps {
     toolbox: Toolbox
     onToolboxUpdate: (description: string) => Promise<void>
     onShowPostEndpoint: () => void
+    usePreDefinedVarsInProd: boolean
+    onTogglePreDefinedVarsInProd: (value: boolean) => void
 }
 
 export function CodeEditorSection({
     code,
     onCodeChange,
     selectedVarCode,
+    selectedVarName,
     method,
     endpoint,
     isRunning,
@@ -34,16 +48,29 @@ export function CodeEditorSection({
     editorErrors,
     toolbox,
     onToolboxUpdate,
-    onShowPostEndpoint
+    onShowPostEndpoint,
+    usePreDefinedVarsInProd,
+    onTogglePreDefinedVarsInProd,
 }: CodeEditorSectionProps) {
     const { theme } = useTheme()
     const [showToolboxDialog, setShowToolboxDialog] = useState(false)
     const [localToolboxDescription, setLocalToolboxDescription] = useState(toolbox.description)
+    const [showProdWarning, setShowProdWarning] = useState(false)
+    const [pendingCheckboxValue, setPendingCheckboxValue] = useState(false)
 
     // Update local state when prop changes
     useEffect(() => {
         setLocalToolboxDescription(toolbox.description)
     }, [toolbox.description])
+
+    const handlePreDefinedVarsToggle = (checked: boolean) => {
+        if (checked) {
+            setShowProdWarning(true)
+            setPendingCheckboxValue(checked)
+        } else {
+            onTogglePreDefinedVarsInProd(false)
+        }
+    }
 
     return (
         <div className="w-1/2 p-6">
@@ -95,10 +122,28 @@ export function CodeEditorSection({
                 </div>
                 <div className="flex-1 flex flex-col min-h-0">
                     {selectedVarCode && (
-                        <div className="flex-none p-2 bg-muted/50 border-b">
-                            <pre className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                {"//To change the predefined variables, click on predefined tab and then set the variables. \n\n" + selectedVarCode}
-                            </pre>
+                        <div className="flex-none border-b">
+                            <Accordion type="single" collapsible className="w-full">
+                                <AccordionItem value="variables" className="border-none">
+                                    <AccordionTrigger className={cn(
+                                        "px-4 py-2 hover:no-underline",
+                                        "data-[state=open]:bg-muted/50"
+                                    )}>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium">
+                                                Pre-defined Code {selectedVarName && `(${selectedVarName})`}
+                                            </span>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="bg-muted/50">
+                                        <div className="px-4 pb-2">
+                                            <pre className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                                {selectedVarCode}
+                                            </pre>
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            </Accordion>
                         </div>
                     )}
                     <div className="flex-1 min-h-0">
@@ -142,6 +187,29 @@ export function CodeEditorSection({
                         </div>
                     )}
                 </div>
+
+                <AlertDialog open={showProdWarning} onOpenChange={setShowProdWarning}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Warning: Production Use</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Using predefined variables in production means they will be directly included in the code. 
+                                This could expose sensitive data or make your code less maintainable. Are you sure you want to proceed?
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => setPendingCheckboxValue(false)}>
+                                Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction onClick={() => {
+                                onTogglePreDefinedVarsInProd(pendingCheckboxValue)
+                                setShowProdWarning(false)
+                            }}>
+                                Continue
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
 
             {/* Toolbox Dialog */}

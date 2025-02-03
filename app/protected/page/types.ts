@@ -20,7 +20,9 @@ export const pageSchema = z.object({
         returnValue: z.string(),
         request: z.string(),
         success: z.boolean()
-    })).default([])
+    })).default([]),
+    in_production_vars: z.boolean().default(false),
+    category: z.number().nullable()
 })
 
 export type PageFormData = z.infer<typeof pageSchema>

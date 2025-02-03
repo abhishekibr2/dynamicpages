@@ -144,3 +144,12 @@ export const clearLogs = async (pageId: string) => {
     }
     return data;
 };
+
+export const getPagesByCategory = async (categoryId: number) => {
+    const supabase = createClient();
+    const { data, error } = await supabase.from('pages').select('*').eq('category', categoryId);
+    if (error) {
+        throw new Error('Failed to fetch pages by category');
+    }
+    return data;
+};

@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils"
 import { UseFormRegister, FieldErrors } from "react-hook-form"
 import { PageFormData } from "../types"
+import { useEffect, useState } from "react"
+import { Category } from "@/types/Category"
+import { getCategories } from "@/utils/supabase/actions/categories"
 
 interface PageInfoDialogProps {
     showDialog: boolean
@@ -16,6 +19,8 @@ interface PageInfoDialogProps {
     errors: FieldErrors<PageFormData>
     method: string
     onMethodChange: (value: string) => void
+    category?: number
+    onCategoryChange: (value: number | null) => void
 }
 
 export function PageInfoDialog({
@@ -24,8 +29,24 @@ export function PageInfoDialog({
     register,
     errors,
     method,
-    onMethodChange
+    onMethodChange,
+    category,
+    onCategoryChange
 }: PageInfoDialogProps) {
+    const [categories, setCategories] = useState<Category[]>([])
+
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const data = await getCategories()
+                setCategories(data)
+            } catch (error) {
+                console.error('Error fetching categories:', error)
+            }
+        }
+        fetchCategories()
+    }, [])
+
     return (
         <Dialog open={showDialog} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl">
@@ -65,7 +86,7 @@ export function PageInfoDialog({
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="endpoint">Endpoint</Label>
                             <Input
@@ -98,6 +119,40 @@ export function PageInfoDialog({
                             </Select>
                             {errors.method && (
                                 <p className="text-sm text-destructive">{errors.method.message}</p>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="category">Category</Label>
+                            <Select
+                                value={category?.toString() || "none"}
+                                onValueChange={(value) => {
+                                    const categoryId = value === "none" ? null : parseInt(value, 10)
+                                    onCategoryChange(categoryId)
+                                }}
+                            >
+                                <SelectTrigger className={cn(
+                                    errors.category && "border-destructive focus-visible:ring-destructive"
+                                )}>
+                                    <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">No Category</SelectItem>
+                                    {categories.map((cat) => (
+                                        <SelectItem key={cat.id} value={cat.id?.toString() || '0'}>
+                                            <div className="flex items-center gap-2">
+                                                <div 
+                                                    className="w-3 h-3 rounded-full" 
+                                                    style={{ backgroundColor: cat.color }}
+                                                />
+                                                {cat.name}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {errors.category && (
+                                <p className="text-sm text-destructive">{errors.category.message}</p>
                             )}
                         </div>
                     </div>

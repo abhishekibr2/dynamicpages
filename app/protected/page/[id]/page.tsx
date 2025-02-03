@@ -22,6 +22,8 @@ import { PostEndpointDialog } from "../components/PostEndpointDialog"
 import { GeneratedCodeDialog } from "../components/GeneratedCodeDialog"
 import { getPreDefinedFunctions } from "@/utils/supabase/actions/preDefinedFunctions"
 import { PreDefinedFunction } from "@/types/PreDefinedFunctions"
+import { Button } from "@/components/ui/button"
+import { ExternalLink } from "lucide-react"
 
 interface PageEditorProps {
     params: Promise<{
@@ -60,6 +62,8 @@ export default function PageEditor({ params }: PageEditorProps) {
     const [lastKeyPress, setLastKeyPress] = useState<string>('')
     const [lastKeyPressTime, setLastKeyPressTime] = useState<number>(0)
     const [preDefinedFunctions, setPreDefinedFunctions] = useState<PreDefinedFunction[]>([])
+    const [usePreDefinedVarsInProd, setUsePreDefinedVarsInProd] = useState(false)
+    const [queryParams, setQueryParams] = useState<string>('')
 
     const {
         register,
@@ -79,7 +83,9 @@ export default function PageEditor({ params }: PageEditorProps) {
             created_at: new Date().toISOString(),
             preDefinedVariables: null,
             test_post_body: null,
-            logs: []
+            logs: [],
+            in_production_vars: false,
+            category: null
         }
     })
 
@@ -94,35 +100,51 @@ export default function PageEditor({ params }: PageEditorProps) {
             method: watch('method'),
             code: actualCode,
             preDefinedVariables: watch('preDefinedVariables'),
-            test_post_body: watch('method') === 'POST' ? postBody : null,
-            created_at: watch('created_at'),
-            logs: (watch('logs') || []).map(log => ({
-                ...log,
-                request: log.request || JSON.stringify({}),
-                success: log.success || false
-            }))
-        } as const;
-
-        const isValidKey = (key: string): key is keyof typeof currentFormState => {
-            return key in currentFormState;
+            test_post_body: watch('method') === 'POST' ? postBody : queryParams,
+            in_production_vars: watch('in_production_vars'),
+            category: watch('category')
         };
 
         const hasChanges = Object.keys(currentFormState).some(key => {
-            if (!isValidKey(key)) return false;
-            if (key === 'logs') return false; // Don't consider logs for unsaved changes
-            if (key === 'preDefinedVariables') {
-                const current = currentFormState.preDefinedVariables;
-                const initial = initialFormState.preDefinedVariables;
-                return (current === null && initial !== null) ||
-                    (current !== null && initial === null) ||
-                    (current !== initial);
+            const k = key as keyof typeof currentFormState;
+            
+            // Skip comparison if both values are null/undefined
+            if (!currentFormState[k] && !initialFormState[k]) return false;
+            
+            // Special handling for preDefinedVariables
+            if (k === 'preDefinedVariables') {
+                return Number(currentFormState[k]) !== Number(initialFormState[k]);
             }
-            return JSON.stringify(currentFormState[key]) !==
-                JSON.stringify(initialFormState[key]);
+
+            // Special handling for test_post_body to ensure consistent comparison
+            if (k === 'test_post_body') {
+                try {
+                    const current = currentFormState[k] ? JSON.stringify(JSON.parse(currentFormState[k])) : '';
+                    const initial = initialFormState[k] ? JSON.stringify(JSON.parse(initialFormState[k])) : '';
+                    return current !== initial;
+                } catch {
+                    return currentFormState[k] !== initialFormState[k];
+                }
+            }
+
+            // Regular comparison for other fields
+            return JSON.stringify(currentFormState[k]) !== JSON.stringify(initialFormState[k]);
         });
 
         setHasUnsavedChanges(hasChanges);
-    }, [watch('title'), watch('description'), watch('endpoint'), watch('method'), actualCode, watch('preDefinedVariables'), initialFormState]);
+    }, [
+        watch('title'),
+        watch('description'),
+        watch('endpoint'),
+        watch('method'),
+        actualCode,
+        watch('preDefinedVariables'),
+        postBody,
+        queryParams,
+        watch('in_production_vars'),
+        watch('category'),
+        initialFormState
+    ]);
 
     // Effect to fetch and update selected predefined variable's code
     useEffect(() => {
@@ -131,7 +153,9 @@ export default function PageEditor({ params }: PageEditorProps) {
             if (selectedVarId !== null) {
                 const selectedVar = preDefinedVariables.find(v => Number(v.id) === selectedVarId)
                 if (selectedVar && selectedVar.vars) {
-                    const varsCode = selectedVar.vars.join('\n')
+                    const varsCode = Array.isArray(selectedVar.vars)
+                        ? selectedVar.vars.join('\n')
+                        : selectedVar.vars
                     setSelectedVarCode(varsCode)
                 } else {
                     setSelectedVarCode('')
@@ -141,7 +165,7 @@ export default function PageEditor({ params }: PageEditorProps) {
             }
         }
         fetchSelectedVarCode()
-    }, [watch('preDefinedVariables')])
+    }, [watch('preDefinedVariables'), preDefinedVariables])
 
     const handleCodeChange = (value: string | undefined) => {
         const newValue = value || ''
@@ -163,7 +187,7 @@ export default function PageEditor({ params }: PageEditorProps) {
             if (type === 'back') {
                 router.back()
             } else {
-                router.push('/protected')
+                router.push('/protected/pages')
             }
         }
     }
@@ -176,8 +200,12 @@ export default function PageEditor({ params }: PageEditorProps) {
         if (pendingNavigation === 'back') {
             router.back()
         } else {
-            router.push('/protected')
+            router.push('/protected/pages')
         }
+    }
+
+    const handleQueryParamsChange = (value: string | undefined) => {
+        setQueryParams(value || '')
     }
 
     useEffect(() => {
@@ -198,7 +226,9 @@ export default function PageEditor({ params }: PageEditorProps) {
                 created_at: new Date().toISOString(),
                 preDefinedVariables: null,
                 test_post_body: null,
-                logs: []
+                logs: [],
+                in_production_vars: false,
+                category: null
             });
             // Show page info dialog for new page
             setShowPageInfoDialog(true)
@@ -214,7 +244,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 toast({
                     variant: "destructive",
                     title: "Error",
-                    description: "Failed to fetch pre-defined variables",
+                    description: "Failed to fetch Pre-defined Codes",
                 })
             }
         }
@@ -233,7 +263,14 @@ export default function PageEditor({ params }: PageEditorProps) {
             // Set post body if it exists and method is POST
             if (data.method === 'POST' && data.test_post_body) {
                 setPostBody(data.test_post_body)
+            } else if (data.method === 'GET' && data.test_post_body) {
+                // For GET requests, set query params from test_post_body
+                setQueryParams(data.test_post_body)
             }
+            console.log(data.in_production_vars)
+            // Set in_production_vars state
+            setUsePreDefinedVarsInProd(data.in_production_vars || false)
+            setValue('in_production_vars', data.in_production_vars || false)
 
             // Set form values and track initial state
             const initialState = {
@@ -249,7 +286,9 @@ export default function PageEditor({ params }: PageEditorProps) {
                     ...log,
                     request: log.request || JSON.stringify({}),
                     success: log.success || false
-                }))
+                })),
+                in_production_vars: data.in_production_vars || false,
+                category: data.category
             };
 
             // Set all form values
@@ -260,7 +299,9 @@ export default function PageEditor({ params }: PageEditorProps) {
                     if (value) {
                         const selectedVar = preDefinedVariables.find(v => Number(v.id) === Number(value))
                         if (selectedVar && selectedVar.vars) {
-                            const varsCode = selectedVar.vars.join('\n')
+                            const varsCode = Array.isArray(selectedVar.vars)
+                                ? selectedVar.vars.join('\n')
+                                : selectedVar.vars
                             setSelectedVarCode(varsCode)
                         }
                     }
@@ -277,7 +318,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 title: "Error",
                 description: "Failed to fetch page",
             })
-            router.push('/protected')
+            router.push('/protected/pages')
         } finally {
             setIsLoading(false)
         }
@@ -288,18 +329,23 @@ export default function PageEditor({ params }: PageEditorProps) {
             // Use actual code without predefined variables for saving
             const codeToSave = actualCode
 
+            // Determine which parameters to save based on method
+            const paramsToSave = watch('method') === 'POST' ? postBody : queryParams
+
             if (isNewPage) {
                 const { id, ...newPageData } = data
                 const result = await createPage({
                     ...newPageData,
                     code: codeToSave,
                     preDefinedVariables: newPageData.preDefinedVariables ? Number(newPageData.preDefinedVariables) : null,
-                    test_post_body: watch('method') === 'POST' ? postBody : null,
+                    test_post_body: paramsToSave,
                     logs: (newPageData.logs || []).map(log => ({
                         ...log,
                         request: log.request || JSON.stringify({}),
                         success: log.success || false
                     })),
+                    in_production_vars: usePreDefinedVarsInProd,
+                    category: newPageData.category || undefined 
                 })
                 const newPageId = result[0].id
                 router.replace(`/protected/page/${newPageId}`)
@@ -309,12 +355,14 @@ export default function PageEditor({ params }: PageEditorProps) {
                     ...newPageData,
                     code: codeToSave,
                     preDefinedVariables: newPageData.preDefinedVariables ? Number(newPageData.preDefinedVariables) : null,
-                    test_post_body: watch('method') === 'POST' ? postBody : null,
+                    test_post_body: paramsToSave,
                     logs: (newPageData.logs || []).map(log => ({
                         ...log,
                         request: log.request || JSON.stringify({}),
                         success: log.success || false
-                    }))
+                    })),
+                    in_production_vars: usePreDefinedVarsInProd,
+                    category: newPageData.category
                 };
                 setInitialFormState(savedState);
                 setInitialCode(codeToSave)
@@ -330,26 +378,30 @@ export default function PageEditor({ params }: PageEditorProps) {
                     ...updateData,
                     code: codeToSave,
                     preDefinedVariables: updateData.preDefinedVariables ? Number(updateData.preDefinedVariables) : null,
-                    test_post_body: watch('method') === 'POST' ? postBody : null,
+                    test_post_body: paramsToSave,
                     logs: (watch('logs') || []).map(log => ({
                         ...log,
                         request: log.request || JSON.stringify({}),
                         success: log.success || false
-                    }))
+                    })),
+                    in_production_vars: usePreDefinedVarsInProd,
+                    category: updateData.category || undefined
                 })
-
+                console.log(usePreDefinedVarsInProd)
                 // Update initial state after successful save
                 const savedState = {
                     ...updateData,
                     code: codeToSave,
                     created_at: created_at,
                     preDefinedVariables: updateData.preDefinedVariables ? Number(updateData.preDefinedVariables) : null,
-                    test_post_body: watch('method') === 'POST' ? postBody : null,
+                    test_post_body: paramsToSave,
                     logs: (watch('logs') || []).map(log => ({
                         ...log,
                         request: log.request || JSON.stringify({}),
                         success: log.success || false
-                    }))
+                    })),
+                    in_production_vars: usePreDefinedVarsInProd,
+                    category: updateData.category
                 };
                 setInitialFormState(savedState);
                 setInitialCode(codeToSave)
@@ -377,7 +429,7 @@ export default function PageEditor({ params }: PageEditorProps) {
                 title: "Success",
                 description: "Page deleted successfully",
             })
-            router.push('/protected')
+            router.push('/protected/pages')
         } catch (error) {
             toast({
                 variant: "destructive",
@@ -441,8 +493,17 @@ export default function PageEditor({ params }: PageEditorProps) {
                     return
                 }
             }
-            console.log(watch('preDefinedVariables'))
-            const response = await fetch(`/api${watch('endpoint')}?preDefinedVariables=${watch('preDefinedVariables')}&logs=true`, requestConfig)
+            var url = `/api${watch('endpoint')}?preDefinedVariables=${watch('preDefinedVariables')}&logs=true`
+            if (method === 'GET') {
+                // convert json into query string in the format of ?key=value&key=value
+                const queryParamsObject = JSON.parse(queryParams)
+                const queryParamsString = Object.entries(queryParamsObject)
+                    .map(([key, value]) => `${key}=${value}`)
+                    .join('&')
+
+                url += queryParamsString ? `&${queryParamsString}` : ''
+            }
+            const response = await fetch(url, requestConfig)
             const data = await response.json()
 
             let outputText = ''
@@ -518,6 +579,10 @@ export default function PageEditor({ params }: PageEditorProps) {
     const getGeneratedCode = () => {
         const method = watch('method')
         const endpoint = watch('endpoint')
+        const preDefinedVarsQuery = usePreDefinedVarsInProd && watch('preDefinedVariables')
+            ? `?preDefinedVariables=${watch('preDefinedVariables')}`
+            : ''
+
         const code = `const fetch = require('node-fetch');
 
 const query_data = $array_of_fields;  //return query_data;
@@ -531,7 +596,7 @@ const rankingFor = ["linkedin.com", "ibrinfotech.com", "vocal.com"];
 jsonObject["ranking_for"] = rankingFor;
 
 ${method === 'POST' ? 'const raw = JSON.stringify(jsonObject);' : ''}
-const url = 'https://dynamicpages.vercel.app/api${endpoint}';
+const url = 'https://dynamicpages.vercel.app/api${endpoint}${preDefinedVarsQuery}';
 const options = {
     method: '${method}',
     headers: {
@@ -629,6 +694,13 @@ function convertToDataIndex(inputArray) {
         setValue('code', newValue, { shouldDirty: true })
     }
 
+    const selectedVarName = preDefinedVariables.find(v => Number(v.id) === watch('preDefinedVariables'))?.title
+
+    // Add an effect to update the form value when usePreDefinedVarsInProd changes
+    useEffect(() => {
+        setValue('in_production_vars', usePreDefinedVarsInProd)
+    }, [usePreDefinedVarsInProd, setValue])
+
     if (isLoading) {
         return <SkeletonPage />
     }
@@ -656,6 +728,8 @@ function convertToDataIndex(inputArray) {
                 errors={errors}
                 method={watch('method')}
                 onMethodChange={(value) => setValue('method', value as 'GET' | 'POST')}
+                category={watch('category') || undefined}
+                onCategoryChange={(value) => setValue('category', value)}
             />
 
             <GeneratedCodeDialog
@@ -669,6 +743,7 @@ function convertToDataIndex(inputArray) {
                     code={userCode}
                     onCodeChange={handleCodeChange}
                     selectedVarCode={selectedVarCode}
+                    selectedVarName={selectedVarName}
                     method={watch('method')}
                     endpoint={watch('endpoint')}
                     isRunning={isRunning}
@@ -677,6 +752,8 @@ function convertToDataIndex(inputArray) {
                     toolbox={toolbox}
                     onToolboxUpdate={handleToolboxUpdate}
                     onShowPostEndpoint={() => setShowPostEndpointDialog(true)}
+                    usePreDefinedVarsInProd={usePreDefinedVarsInProd}
+                    onTogglePreDefinedVarsInProd={setUsePreDefinedVarsInProd}
                 />
 
                 <OutputSection
@@ -692,6 +769,7 @@ function convertToDataIndex(inputArray) {
                     postBody={postBody}
                     onPostBodyChange={(value) => setPostBody(value || '')}
                     preDefinedVariables={preDefinedVariables}
+                    in_production_vars={watch('in_production_vars')}
                     selectedPreDefinedVarId={watch('preDefinedVariables')}
                     onPreDefinedVarChange={(id) => setValue('preDefinedVariables', id)}
                     onAddNewVar={() => {
@@ -708,6 +786,23 @@ function convertToDataIndex(inputArray) {
                     }}
                     preDefinedFunctions={preDefinedFunctions}
                     onInsertFunction={handleInsertFunction}
+                    onEditSuccess={async () => {
+                        try {
+                            const functions = await getPreDefinedFunctions()
+                            setPreDefinedFunctions(functions)
+                        } catch (error) {
+                            console.error('Failed to refresh pre-defined functions:', error)
+                            toast({
+                                variant: "destructive",
+                                title: "Error",
+                                description: "Failed to refresh pre-defined functions",
+                            })
+                        }
+                    }}
+                    usePreDefinedVarsInProd={usePreDefinedVarsInProd}
+                    onTogglePreDefinedVarsInProd={setUsePreDefinedVarsInProd}
+                    queryParams={queryParams}
+                    onQueryParamsChange={handleQueryParamsChange}
                 />
             </div>
 
@@ -723,7 +818,7 @@ function convertToDataIndex(inputArray) {
                         toast({
                             variant: "destructive",
                             title: "Error",
-                            description: "Failed to refresh pre-defined variables",
+                            description: "Failed to refresh Pre-defined Codes",
                         })
                     }
                 }}

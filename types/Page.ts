@@ -16,4 +16,6 @@ export type Page = {
         request: string;
         success: boolean;
     }[];
+    in_production_vars: boolean;
+    category?: number;
 };

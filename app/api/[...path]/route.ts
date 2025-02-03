@@ -82,13 +82,20 @@ const executeCodeInVM = (code: string, context: any, timeout = 5000, extractedVa
       const preDefinedVars = extractedVars ? extractedVars.join('\n') : ''
       let requestDataString;
       try {
+        // Get query parameters from the context
+        const queryParams = Object.fromEntries(new URL(context.request.url).searchParams);
+        // Remove internal params that shouldn't be exposed to user code
+        delete queryParams.preDefinedVariables;
+        delete queryParams.logs;
+        
         requestDataString = requestData;
         const data = requestDataString ? JSON.stringify(requestDataString) : 'null'
         const wrappedCode = `
           (async function() {
             try {
               const result = await (async () => {
-                const reqQuery = ${data}
+                const reqQuery = ${data};
+                const queryParams = ${JSON.stringify(queryParams)}; // Make query params available
                 ${preDefinedVars}
                 ${code}
               })();
@@ -192,7 +199,7 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
           method,
           url: request.url,
           query: Object.fromEntries(request.nextUrl.searchParams),
-          body: method === 'POST' ? data : null
+          body: method === 'POST' ? data : null,
         }),
         success: false
       }
@@ -208,6 +215,21 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
       )
     }
 
+    // Check if this is a local call with predefined variables
+    const isLocalCall = preDefinedVariables !== null;
+
+    // If not a local call and in_production_vars is true, fetch predefined variables
+    let extractedVars = null;
+    if (!isLocalCall && page.in_production_vars && page.preDefinedVariables) {
+      const preDefinedVariable = await getPreDefinedVariable(page.preDefinedVariables);
+      extractedVars = preDefinedVariable?.vars || null;
+    } 
+    // If it's a local call, use the provided preDefinedVariables
+    else if (isLocalCall && preDefinedVariables) {
+      const preDefinedVariable = await getPreDefinedVariable(preDefinedVariables);
+      extractedVars = preDefinedVariable?.vars || null;
+    }
+
     // Prepare the execution context
     const context = {
       request: {
@@ -218,7 +240,7 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
         body: method === 'POST' ? {
           code: data?.code || '',
           data: data?.data || null
-        } : null
+        } : null,
       },
       response: {
         status: 200,
@@ -226,13 +248,6 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
         body: null
       }
     }
-
-    let extractedVars = null
-    if (preDefinedVariables) {
-      const preDefinedVariable = await getPreDefinedVariable(preDefinedVariables)
-      extractedVars = preDefinedVariable?.vars || null
-    }
-
     const result = await executeCodeInVM(page.code, context, 5000, extractedVars, data)
 
     // Create log entry for any case (success or failure)
@@ -249,7 +264,7 @@ async function handleRequest(request: NextRequest, method: string, data: any | n
         method,
         url: request.url,
         query: Object.fromEntries(request.nextUrl.searchParams),
-        body: method === 'POST' ? data : null
+        body: method === 'POST' ? data : null,
       }),
       success: result.success
     }

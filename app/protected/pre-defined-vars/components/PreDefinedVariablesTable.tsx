@@ -50,7 +50,7 @@ const PreDefinedVariableTableComponent = forwardRef<PreDefinedVariableTableRef, 
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Failed to fetch pre-defined variables",
+          description: "Failed to fetch Pre-defined Codes",
         })
       }
     }
@@ -71,14 +71,14 @@ const PreDefinedVariableTableComponent = forwardRef<PreDefinedVariableTableRef, 
         await deletePreDefinedVariable(preDefinedVariableToDelete)
         toast({
           title: "Success",
-          description: "Pre-defined variable deleted successfully",
+          description: "Pre-defined Code deleted successfully",
         })
         fetchPreDefinedVariables()
       } catch (error) {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Failed to delete pre-defined variable",
+          description: "Failed to delete Pre-defined Code",
         })
       } finally {
         setDeleteDialogOpen(false)
@@ -98,8 +98,8 @@ const PreDefinedVariableTableComponent = forwardRef<PreDefinedVariableTableRef, 
       <>
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">Pre-defined Variables</h2>
-            <Button onClick={onAddNew}>Add New Pre-defined Variable</Button>
+            <h2 className="text-2xl font-bold">Pre-defined Code</h2>
+            <Button onClick={onAddNew}>Add New Pre-defined Code</Button>
           </div>
           <div className="rounded-md border">
             <Table>
@@ -157,7 +157,7 @@ const PreDefinedVariableTableComponent = forwardRef<PreDefinedVariableTableRef, 
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the pre-defined variable.
+                This action cannot be undone. This will permanently delete the Pre-defined Code.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
