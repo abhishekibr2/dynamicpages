@@ -62,13 +62,13 @@ export function PreDefinedVariableDialog({
                 await updatePreDefinedVariable(preDefinedVariable.id, formData as PreDefinedVariable)
                 toast({
                     title: "Success",
-                    description: "Pre-defined variable updated successfully",
+                    description: "Pre-defined Code updated successfully",
                 })
             } else {
                 await createPreDefinedVariable(formData as PreDefinedVariable)
                 toast({
                     title: "Success",
-                    description: "Pre-defined variable created successfully",
+                    description: "Pre-defined Code created successfully",
                 })
             }
             onSuccess()
@@ -77,7 +77,7 @@ export function PreDefinedVariableDialog({
             toast({
                 variant: "destructive",
                 title: "Error",
-                description: preDefinedVariable ? "Failed to update pre-defined variable" : "Failed to create pre-defined variable",
+                description: preDefinedVariable ? "Failed to update Pre-defined Code" : "Failed to create Pre-defined Code",
             })
         }
     }
@@ -86,7 +86,7 @@ export function PreDefinedVariableDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{preDefinedVariable ? 'Edit Pre-defined Variable' : 'Create Pre-defined Variable'}</DialogTitle>
+                    <DialogTitle>{preDefinedVariable ? 'Edit Pre-defined Code' : 'Create Pre-defined Code'}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">

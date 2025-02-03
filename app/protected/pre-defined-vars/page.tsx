@@ -2,14 +2,14 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, PlusIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { PreDefinedVariable } from "@/types/PreDefinedVariable"
 import { PreDefinedVariableTable } from "./components/PreDefinedVariablesTable"
 import { PreDefinedVariableDialog } from "./components/PreDefinedVariablesDialog"
 import Link from "next/link"
 
-export default function ProtectedPreDefinedVariable() {
+export default function PreDefinedVarsPage() {
     const [selectedPreDefinedVariable, setSelectedPreDefinedVariable] = useState<PreDefinedVariable>()
     const [dialogOpen, setDialogOpen] = useState(false)
     const tableRef = useRef<{ fetchPreDefinedVariables: () => void }>({ fetchPreDefinedVariables: () => { } })

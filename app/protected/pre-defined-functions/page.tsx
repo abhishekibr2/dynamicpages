@@ -9,9 +9,9 @@ import { PreDefinedFunction } from "@/types/PreDefinedFunctions"
 import Link from "next/link"
 import { PreDefinedFunctionTable } from "./components/PreDefinedFunctionssTable"
 import { PreDefinedFunctionDialog } from "./components/PreDefinedFunctionsDialog"
+import { PlusIcon } from "lucide-react"
 
-
-export default function ProtectedPreDefinedFunctions() {
+export default function PreDefinedFunctionsPage() {
     const [selectedPreDefinedFunction, setSelectedPreDefinedFunction] = useState<PreDefinedFunction>()
     const [dialogOpen, setDialogOpen] = useState(false)
     const tableRef = useRef<{ fetchPreDefinedFunctions: () => void }>({ fetchPreDefinedFunctions: () => { } })
@@ -80,28 +80,28 @@ export default function ProtectedPreDefinedFunctions() {
     }, [lastKeyPress, lastKeyPressTime])
 
     return (
-        <div className="flex h-full w-[60%] flex-col">
-            <Link href="/protected" className="max-w-fit">
-                <div className="flex items-center gap-2 border rounded-md px-2 py-1 mt-2 bg-muted">
-                    <ArrowLeft className="h-4 w-4" />
-                    Back
+        <div className="container mx-auto py-10 space-y-4">
+            <div className="flex h-full flex-col">
+                <Link href="/protected" className="max-w-fit">
+                    <div className="flex items-center gap-2 border rounded-md px-2 py-1 mt-2 bg-muted">
+                        <ArrowLeft className="h-4 w-4" />
+                        Back
+                    </div>
+                </Link>
+                <div className="flex-1 min-h-0 w-full bg-card rounded-lg shadow-sm p-4 mt-2">
+                    <PreDefinedFunctionTable
+                        ref={tableRef}
+                        onEdit={handleEdit}
+                        onAddNew={handleAddNew}
+                    />
                 </div>
-            </Link>
-            <div className="flex-1 min-h-0 w-full bg-card rounded-lg shadow-sm p-4 mt-2">
-                <PreDefinedFunctionTable
-                    ref={tableRef}
-                    onEdit={handleEdit}
-                    onAddNew={handleAddNew}
-
+                <PreDefinedFunctionDialog
+                    preDefinedFunction={selectedPreDefinedFunction}
+                    open={dialogOpen}
+                    onOpenChange={setDialogOpen}
+                    onSuccess={handleSuccess}
                 />
             </div>
-            <PreDefinedFunctionDialog
-                preDefinedFunction={selectedPreDefinedFunction}
-                open={dialogOpen}
-                onOpenChange={setDialogOpen}
-                onSuccess={handleSuccess}
-
-            />
         </div>
     )
 }
