@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Script, createContext } from 'vm'
 import { getPageByEndpoint, addLog } from '@/utils/supabase/actions/page'
 import { getPreDefinedVariable } from '@/utils/supabase/actions/preDefinedVars'
+import * as CryptoJS from 'crypto-js'
 
 interface ExecutionResponse {
   success: boolean
@@ -73,11 +74,26 @@ const executeCodeInVM = (code: string, context: any, timeout = 5000, extractedVa
             return this.request({ ...config, url, method: 'post', data });
           }
         },
+        require: require,
         request: context.request,
         response: context.response,
         setTimeout,
         clearTimeout,
-        Promise
+        Promise,
+        CryptoJS: {
+          AES: CryptoJS.AES,
+          enc: CryptoJS.enc,
+          mode: CryptoJS.mode,
+          pad: CryptoJS.pad,
+          lib: CryptoJS.lib,
+          SHA256: CryptoJS.SHA256,
+          SHA512: CryptoJS.SHA512,
+          MD5: CryptoJS.MD5,
+          HmacSHA256: CryptoJS.HmacSHA256,
+          Base64: CryptoJS.enc.Base64,
+          Utf8: CryptoJS.enc.Utf8,
+          Hex: CryptoJS.enc.Hex
+        }
       });
       const preDefinedVars = extractedVars ? extractedVars.join('\n') : ''
       let requestDataString;
